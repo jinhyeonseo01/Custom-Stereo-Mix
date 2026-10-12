@@ -34,6 +34,11 @@ public partial class MainWindow : Window
             System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(SessionMessage);
         };
         _model = model;
+        SizeChanged += (_, _) =>
+        {
+            if (_modelInitialized && WindowState == WindowState.Normal && !_changingModeSize)
+                _model.RememberWindowSize(ActualWidth, ActualHeight);
+        };
         StartupMessage.Text = model.Text(MessageKey.PreparingInterface);
         RetryButton.Content = model.Text(MessageKey.Retry);
         RuntimeButton.Content = model.Text(MessageKey.RuntimeGuide);
@@ -65,7 +70,7 @@ public partial class MainWindow : Window
         _bridge.Changed += (_, _) => ScheduleState();
         _meterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Background, (_, _) =>
         {
-            if (_meterDirty && _pageReady && IsVisible)
+            if ((_meterDirty || _model.IsRouting) && _pageReady && IsVisible)
             {
                 _meterDirty = false;
                 Post(new { type = "meter", meter = _bridge.Meter() });
@@ -113,6 +118,14 @@ public partial class MainWindow : Window
         Width = Math.Min(Width, availableWidth);
         Height = Math.Min(Height, availableHeight);
     }
+    private bool _changingModeSize;
+    private void ApplyModeWindowSize()
+    {
+        if (WindowState != WindowState.Normal) return;
+        _changingModeSize = true;
+        try { Width = _model.WindowSize.Width; Height = _model.WindowSize.Height; FitInitialWindow(); }
+        finally { _changingModeSize = false; }
+    }
 
     private async Task InitializeBrowserAsync()
     {
@@ -128,6 +141,7 @@ public partial class MainWindow : Window
             {
                 await _model.InitializeAsync();
                 _modelInitialized = true;
+                ApplyModeWindowSize();
                 UpdateTray();
                 StartupMessage.Text = _model.Text(MessageKey.PreparingInterface);
             }
@@ -178,7 +192,7 @@ public partial class MainWindow : Window
         try
         {
             var json = e.WebMessageAsJson;
-            if (json.Length > 65536) return;
+            if (json.Length > 262144) return;
             using var message = JsonDocument.Parse(json);
             var response = await _bridge.HandleAsync(message.RootElement);
             if (_exiting) return;
@@ -238,6 +252,7 @@ public partial class MainWindow : Window
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => ModelChanged(sender, e)); return; }
+        if (e.PropertyName == nameof(MainWindowViewModel.AdvancedMode)) ApplyModeWindowSize();
         if (e.PropertyName is "Waveform" or "SignalState" or "LevelPercent" or "LevelLabel") _meterDirty = true;
         else { UpdateTray(); ScheduleState(); }
     }

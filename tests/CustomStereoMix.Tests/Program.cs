@@ -3,8 +3,19 @@ using CustomStereoMix.Core;
 using NAudio.Wave;
 using CustomStereoMix.State;
 
+if (args.Contains("--list-audio-devices")) { NativeGraphChecks.ListDevices(); return 0; }
+if (args.Contains("--graph-audio-smoke")) { await NativeGraphChecks.SmokeAsync(); return 0; }
+if (args.Contains("--graph-virtual-input-smoke")) { await NativeGraphChecks.SmokeAsync(virtualInput: true); return 0; }
+if (args.Contains("--graph-partial-smoke")) { await NativeGraphChecks.SmokeAsync(true); return 0; }
+
 var tests = new (string Name, Action Body)[]
 {
+    ("graph validates roles, duplicate endpoints and physical feedback across buses", GraphTests.Validation),
+    ("legacy settings migrate without enabling microphone or changing DSP", GraphTests.Migration),
+    ("graph mixing fans out, sums buses at output and isolates send mute", GraphTests.MixAndFanout),
+    ("independent audio queues correct positive and negative clock drift", GraphTests.AdaptiveClocks),
+    ("graph bridge revisions, mode switches, live gains and persistence", GraphTests.BridgeAndPersistence),
+    ("graph settings preserve v1 backup and reject invalid window geometry", GraphTests.StoreMigrationBackup),
     ("installer download verifies checksum, size and source and cleans incomplete files", UpdateDownloadTests.Integrity),
     ("download preserves audio controls and shutdown cancels it; startup resets cleanly", UpdateDownloadTests.CommandGateAndCancellation),
     ("four language resources preserve keys, placeholders and dynamic errors", LocalizationTests.Resources),

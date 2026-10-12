@@ -10,6 +10,7 @@ public sealed record AudioDeviceDescriptor(
     bool IsVirtualCableCandidate,
     VirtualCableKind VirtualCableKind)
 {
+    public string? ReturnPathGroup => VirtualCableClassifier.ReturnPathGroup(Name);
     public string Summary
     {
         get

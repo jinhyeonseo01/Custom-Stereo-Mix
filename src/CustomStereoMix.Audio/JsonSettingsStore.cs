@@ -59,6 +59,12 @@ public sealed class JsonSettingsStore : ISettingsStore
     private static void Validate(AppSettings settings)
     {
         AudioSettingsValidator.Validate(settings.Engine, settings.Processing, settings.Microphone);
+        foreach (var size in new[] { settings.SimpleWindow, settings.AdvancedWindow })
+            if (size is null || !double.IsFinite(size.Width) || !double.IsFinite(size.Height) ||
+                size.Width is < 320 or > 10000 || size.Height is < 320 or > 10000)
+                throw new InvalidDataException("Invalid window size.");
+        if (settings.Graph is not null && GraphValidator.GetError(settings.Graph) is { } issue)
+            throw new InvalidDataException().WithMessage(issue.Key);
     }
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -77,7 +83,21 @@ public sealed class JsonSettingsStore : ISettingsStore
                 stream.Flush(flushToDisk: true);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            if (File.Exists(_path)) File.Replace(temporary, _path, _path + ".bak");
+            if (File.Exists(_path))
+            {
+                // Keep a separate 1.x original: rolling .bak will become a v2 file.
+                if (settings.Graph is not null && !File.Exists(_path + ".v1.bak"))
+                {
+                    try
+                    {
+                        using var original = JsonDocument.Parse(await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false));
+                        if (!original.RootElement.TryGetProperty("graph", out var graph) || graph.ValueKind == JsonValueKind.Null)
+                            File.Copy(_path, _path + ".v1.bak", overwrite: false);
+                    }
+                    catch (JsonException) { /* A corrupt original already follows normal recovery. */ }
+                }
+                File.Replace(temporary, _path, _path + ".bak");
+            }
             else File.Move(temporary, _path);
         }
         finally

@@ -31,6 +31,9 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
     public JsonElement Snapshot() => JsonSerializer.SerializeToElement(new
     {
         revision = Interlocked.Increment(ref _revision), view = _view, guideDraft = _guideDraft,
+        graph = model.Graph, graphRevision = model.GraphRevision, advancedMode = model.AdvancedMode,
+        simpleGraph = model.IsSimpleGraph,
+        simpleBusId = model.SimpleBusId,
         sources = model.Sources.Select(Device), targets = model.Targets.Select(Device), microphones = model.Microphones.Select(Device),
         sourceDeviceId = model.SelectedSource?.Id, targetDeviceId = model.SelectedTarget?.Id,
         microphoneDeviceId = model.SelectedMicrophone?.Id,
@@ -55,10 +58,14 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
 
     private object Device(Core.AudioDeviceDescriptor device) => new
     {
-        device.Id, device.Name, device.IsDefault, device.IsVirtualCableCandidate,
+        device.Id, device.Name, device.IsDefault, device.IsVirtualCableCandidate, device.ReturnPathGroup,
         summary = model.Text(MessageKey.DeviceSummary, device.SampleRate / 1000.0, device.Channels, device.IsDefault ? model.Text(MessageKey.DefaultDevice) : "")
     };
-    public object Meter() => new { model.LevelPercent, model.SignalState, samples = model.Waveform };
+    public object Meter()
+    {
+        var graph = model.GraphSnapshot;
+        return new { model.LevelPercent, model.SignalState, samples = model.Waveform, nodes = graph.Meters, errors = graph.Errors };
+    }
 
     public async Task<object> HandleAsync(JsonElement message)
     {
@@ -94,6 +101,13 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "downloadUpdate": model.DownloadUpdate(); break;
                 case "cancelUpdateDownload": model.CancelUpdateDownload(); break;
                 case "patch": ApplyPatch(payload); break;
+                case "mode": model.SetAdvancedMode(payload.GetProperty("advanced").GetBoolean()); break;
+                case "simpleBus": model.SetSimpleBus(payload.GetProperty("id").GetString()!); break;
+                case "graph":
+                    model.SetGraph(payload.GetProperty("project").Deserialize<GraphProject>(JsonOptions)
+                        ?? throw new InvalidOperationException().WithMessage(MessageKey.GraphInvalid),
+                        payload.GetProperty("revision").GetInt64());
+                    break;
                 case "openHelp": OpenView("help"); break;
                 case "openSettings": OpenView("settings"); break;
                 case "closeView": OpenView("main"); break;
@@ -130,6 +144,8 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
 
     private void ApplyPatch(JsonElement payload)
     {
+        if (!model.IsSimpleGraph && payload.EnumerateObject().Any(f => f.Name is "sourceDeviceId" or "targetDeviceId" or "microphoneDeviceId" or "isMicMixEnabled" or "gainDb" or "micGainDb" or "compressorEnabled" or "compressorThresholdDb" or "compressorRatio"))
+            throw new InvalidOperationException().WithMessage(MessageKey.GraphSimpleReadOnly);
         if (!model.CanEditSettings) throw new InvalidOperationException().WithMessage(MessageKey.WaitSettings);
         var actions = new List<Action>();
         foreach (var field in payload.EnumerateObject())
@@ -175,6 +191,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 (float)Proposed("compressorThresholdDb", model.CompressorThresholdDb), (float)Proposed("compressorRatio", model.CompressorRatio)),
             new Core.MicMixSettings(model.IsMicMixEnabled, (float)Proposed("micGainDb", model.MicGainDb)));
         foreach (var action in actions) action();
+        model.SyncSimpleGraph();
     }
 
     private static Core.AudioDeviceDescriptor FindDevice(IEnumerable<Core.AudioDeviceDescriptor> devices, JsonElement value) =>

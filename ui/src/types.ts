@@ -4,6 +4,7 @@ export interface Device {
   summary: string;
   isDefault: boolean;
   isVirtualCableCandidate: boolean;
+  returnPathGroup?: string | null;
 }
 export interface Settings {
   language: string;
@@ -21,6 +22,11 @@ export interface Settings {
   minimizeToTray: boolean;
 }
 export interface AppState {
+  graph: GraphProject;
+  graphRevision: number;
+  advancedMode: boolean;
+  simpleGraph: boolean;
+  simpleBusId: string | null;
   revision: number;
   view: "main" | "settings" | "help";
   guideDraft: boolean;
@@ -57,11 +63,16 @@ export interface AppState {
   settings: Settings;
 }
 export interface Meter {
+  nodes?: Record<string, { rms: number; peak: number; clipped: boolean }>;
+  errors?: Record<string, string>;
   levelPercent: number;
   signalState: string;
   samples: number[];
 }
 export type Command =
+  | "mode"
+  | "graph"
+  | "simpleBus"
   | "ready"
   | "start"
   | "stop"
@@ -86,6 +97,7 @@ export type Patch = Partial<
   }
 >;
 export interface WebViewBridge {
+  // Audio never crosses this command/state bridge.
   postMessage(message: unknown): void;
   addEventListener(type: "message", handler: (e: MessageEvent) => void): void;
 }
@@ -95,4 +107,19 @@ declare global {
     __stereoPreview?: boolean;
     __initialLanguage?: string;
   }
+}
+export type AudioNodeKind = "loopback" | "capture" | "bus" | "output";
+export interface AudioNodeConfig {
+  id: string; kind: AudioNodeKind; label: string; deviceId: string | null;
+  preferredMicrophoneId?: string | null;
+  preferredMicrophoneGainDb?: number;
+  position: { x: number; y: number };
+  gainDb: number; muted: boolean; enabled: boolean; limiterEnabled: boolean;
+  compressorEnabled: boolean; compressorThresholdDb: number; compressorRatio: number;
+}
+export interface AudioEdgeConfig {
+  id: string; source: string; target: string; gainDb: number; muted: boolean;
+}
+export interface GraphProject {
+  schemaVersion: number; name: string; nodes: AudioNodeConfig[]; edges: AudioEdgeConfig[];
 }

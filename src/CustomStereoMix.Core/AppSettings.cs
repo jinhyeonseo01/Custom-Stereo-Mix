@@ -1,7 +1,13 @@
 namespace CustomStereoMix.Core;
+public sealed record AppWindowSize(double Width, double Height);
 
 public sealed record AppSettings
 {
+    public GraphProject? Graph { get; init; }
+    public bool AdvancedMode { get; init; }
+    public string? SimpleBusId { get; init; }
+    public AppWindowSize SimpleWindow { get; init; } = new(760, 730);
+    public AppWindowSize AdvancedWindow { get; init; } = new(1440, 1000);
     public string? Language { get; init; }
     public string? SourceDeviceId { get; init; }
     public string? TargetDeviceId { get; init; }

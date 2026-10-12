@@ -1,5 +1,6 @@
 import { t, setLanguage, type MessageKey } from "./i18n";
 import type { AppState, Settings, WebViewBridge } from "./types";
+import { previewGraph, graphError, sameTopology } from "./advanced/graph";
 const defaults: Settings = {
   language: "ko-KR",
   startWithWindows: false,
@@ -18,11 +19,23 @@ const defaults: Settings = {
 export function createPreviewBridge(): WebViewBridge {
   const listeners = new Set<(e: MessageEvent) => void>();
   const stress = new URLSearchParams(location.search).has("stress");
+  const cachedGraph = () => {
+    try {
+      const saved = sessionStorage.getItem("stereo-preview-graph");
+      if (saved) { const graph = JSON.parse(saved); if (!graphError(graph)) return graph; }
+    } catch { /* Preview storage is optional. */ }
+    return previewGraph();
+  };
   let state: AppState = {
+    graph: cachedGraph(), graphRevision: 0,
+    advancedMode: new URLSearchParams(location.search).has("advanced"), simpleGraph: false,
+    simpleBusId: null,
     revision: 0,
-    view: "help",
+    view: new URLSearchParams(location.search).has("advanced") ? "main" : "help",
     guideDraft: true,
     sources: [
+      { id: "speakers", name: "Realtek Speakers", summary: "48 kHz · 2채널", isDefault: false, isVirtualCableCandidate: false },
+      { id: "music", name: "USB DAC", summary: "48 kHz · 2채널", isDefault: false, isVirtualCableCandidate: false },
       {
         id: "headphone",
         name: stress
@@ -34,15 +47,19 @@ export function createPreviewBridge(): WebViewBridge {
       },
     ],
     targets: [
+      { id: "headphone", name: "SteelSeries Arctis Nova 5", summary: "48 kHz · 2채널", isDefault: true, isVirtualCableCandidate: false },
+      { id: "cable-a", name: "CABLE-A Input (VB-Audio)", summary: "48 kHz · 2채널", isDefault: false, isVirtualCableCandidate: true, returnPathGroup: "vb:CABLE-A" },
       {
         id: "cable",
         name: "CABLE Input (VB-Audio Virtual Cable)",
         summary: "48 kHz · 2채널",
         isDefault: false,
         isVirtualCableCandidate: true,
+        returnPathGroup: "vb:CABLE",
       },
     ],
     microphones: [
+      { id: "cable-out", name: "CABLE Output (VB-Audio Virtual Cable)", summary: "48 kHz · 2채널", isDefault: false, isVirtualCableCandidate: true, returnPathGroup: "vb:CABLE" },
       {
         id: "mic",
         name: "Microphone (USB Microphone)",
@@ -65,7 +82,7 @@ export function createPreviewBridge(): WebViewBridge {
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
     trayHint: "TrayContinues",
-    appVersion: "v1.3.0",
+    appVersion: "v2.0.0",
     updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
   isDownloadingUpdate: false,
@@ -87,6 +104,8 @@ export function createPreviewBridge(): WebViewBridge {
       emit({
         type: "meter",
         meter: {
+          nodes: Object.fromEntries(state.graph.nodes.map((n, i) => [n.id, { rms: state.isRouting && !n.muted ? .12 + .08 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, peak: state.isRouting && !n.muted ? .24 + .3 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, clipped: false }])),
+          errors: {},
           levelPercent: state.isRouting ? 18 : 0,
           signalState: t(state.isRouting ? "SignalDetected" : "NoSignal"),
           samples: state.isRouting
@@ -111,6 +130,15 @@ export function createPreviewBridge(): WebViewBridge {
         payload: Record<string, unknown>;
       };
       switch (command) {
+        case "mode": state.advancedMode = Boolean(payload.advanced); break;
+        case "simpleBus": state.simpleBusId = String(payload.id); break;
+        case "graph": {
+          const graph = payload.project as AppState["graph"];
+          const error = graphError(graph, state) || (payload.revision !== state.graphRevision ? t("GraphStale") : "") ||
+            (state.isRouting && !sameTopology(state.graph, graph) ? t("StopBeforeChange") : "");
+          if (error) { setTimeout(() => emit({ type: "response", id, ok: false, error }), 20); return; }
+          state.graph = structuredClone(graph); state.graphRevision++; break;
+        }
         case "openHelp":
           state.view = "help";
           break;
@@ -128,7 +156,7 @@ export function createPreviewBridge(): WebViewBridge {
           state.canEditRoute = false;
           state.isStartEnabled = false;
           state.isStopEnabled = true;
-          state.statusText = "Routing";
+          state.statusText = "GraphRunning";
           break;
         case "stop":
           state.isRouting = false;
@@ -174,6 +202,7 @@ export function createPreviewBridge(): WebViewBridge {
           break;
       }
       state.revision++;
+      try { sessionStorage.setItem("stereo-preview-graph", JSON.stringify(state.graph)); } catch { }
       setLanguage(state.settings.language);
       const snapshot = structuredClone(state);
       snapshot.statusText = t(state.statusText as MessageKey);

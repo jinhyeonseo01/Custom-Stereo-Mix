@@ -6,7 +6,7 @@ using CustomStereoMix.Core;
 
 namespace CustomStereoMix.State;
 
-public sealed class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IAudioDeviceService _devices;
     private readonly IAudioRouteController _router;
@@ -47,6 +47,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private double _levelPercent;
     private double _gainDb;
     private bool _compressorEnabled;
+    private bool _limiterEnabled = true;
     private double _compressorThresholdDb = -12;
     private double _compressorRatio = 4;
     private bool _isMicMixEnabled;
@@ -413,7 +414,9 @@ public sealed class MainWindowViewModel : ObservableObject
         ScheduleSave();
     }
     public bool CanEditRoute => !IsRouting && CanEditSettings;
-    public bool IsStartEnabled => CanEditRoute && RouteValidator.GetError(SelectedSource, SelectedTarget, SelectedMicrophone, IsMicMixEnabled) is null;
+    public bool IsStartEnabled => CanEditRoute && (_router is IAudioGraphController
+        ? GraphValidator.GetError(Graph, true, Targets.ToArray(), Microphones.ToArray()) is null
+        : RouteValidator.GetError(SelectedSource, SelectedTarget, SelectedMicrophone, IsMicMixEnabled) is null);
     public bool IsStopEnabled => IsRouting && CanEditSettings;
     public string RouteLine => SelectedSource is null || SelectedTarget is null ? Text(MessageKey.NoRoute) : $"{SelectedSource.Name} -> {SelectedTarget.Name}";
     public string EngineLine => Text(MessageKey.EngineSummary, SampleRate / 1000, Text(Channels == 1 ? MessageKey.Mono : MessageKey.Stereo));
@@ -435,6 +438,8 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         ApplySettings(_loadedSettings);
         await RefreshDevicesAsync();
+        _graph = _loadedSettings.Graph ?? GraphMigration.FromSettings(CaptureSettings());
+        _advancedMode = _loadedSettings.AdvancedMode;
         _initialized = true;
         RefreshComputedState();
     }
@@ -537,6 +542,11 @@ public sealed class MainWindowViewModel : ObservableObject
             StartWithWindows = false;
             Notice = LocalizedMessage.Empty;
             await RefreshDevicesAsync();
+            _graph = GraphMigration.FromSettings(CaptureSettings());
+            _advancedMode = false;
+            GraphRevision++;
+            OnPropertyChanged(nameof(Graph));
+            OnPropertyChanged(nameof(AdvancedMode));
             await SaveCurrentSettingsAsync();
             LevelPercent = 0;
             Waveform = Array.Empty<float>();
@@ -560,7 +570,7 @@ public sealed class MainWindowViewModel : ObservableObject
             var saved = _initialized ? CaptureSettings() : _loadedSettings;
             Refill(Sources, _devices.GetLoopbackSources());
             Refill(Targets, _devices.GetRenderTargets());
-            Refill(Microphones, _devices.GetMicrophones().Where(device => !device.IsVirtualCableCandidate));
+            Refill(Microphones, _devices.GetMicrophones());
             Refill(CableCandidates, Targets.Where(device => device.IsVirtualCableCandidate));
 
             SelectedSource = SelectDevice(Sources, saved.SourceDeviceId) ?? Sources.FirstOrDefault(device => device.IsDefault) ?? Sources.FirstOrDefault();
@@ -588,16 +598,17 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task StartAsync()
     {
-        if (SelectedSource is null || SelectedTarget is null)
+        if (_router is not IAudioGraphController && (SelectedSource is null || SelectedTarget is null))
         {
             return;
         }
 
-        var config = CurrentRouteConfig();
         try
         {
             await SaveCurrentSettingsAsync();
-            await _router.StartAsync(config);
+            if (_router is IAudioGraphController graphRouter)
+                await graphRouter.StartGraphAsync(Graph, CurrentEngine());
+            else await _router.StartAsync(CurrentRouteConfig());
         }
         catch (Exception ex)
         {
@@ -634,12 +645,17 @@ public sealed class MainWindowViewModel : ObservableObject
         CompressorEnabled,
         (float)CompressorThresholdDb,
         (float)CompressorRatio,
-        LimiterEnabled: true);
+        LimiterEnabled: _limiterEnabled);
 
     private MicMixSettings CurrentMicrophone() => new(IsMicMixEnabled, (float)MicGainDb);
 
     private AppSettings CaptureSettings() => new()
         {
+            Graph = _graph,
+            AdvancedMode = _advancedMode,
+            SimpleBusId = _simpleBusId,
+            SimpleWindow = _simpleWindow,
+            AdvancedWindow = _advancedWindow,
             Language = Language,
             SourceDeviceId = SelectedSource?.Id,
             TargetDeviceId = SelectedTarget?.Id,
@@ -713,6 +729,10 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void ApplySettings(AppSettings settings)
     {
+        _simpleWindow = settings.SimpleWindow;
+        _advancedWindow = settings.AdvancedWindow;
+        _limiterEnabled = settings.Processing.LimiterEnabled;
+        _simpleBusId = settings.SimpleBusId;
         Language = LanguageCatalog.Resolve(settings.Language, _initialLanguage);
         MinimizeToTray = settings.MinimizeToTray;
         _hideUsageOnStartup = settings.HideUsageOnStartup;
@@ -730,9 +750,9 @@ public sealed class MainWindowViewModel : ObservableObject
         BufferMilliseconds = settings.Engine.BufferMilliseconds;
     }
 
-    private void PushProcessing() { _router.UpdateProcessing(CurrentProcessing()); ScheduleSave(); }
+    private void PushProcessing() { _router.UpdateProcessing(CurrentProcessing()); SyncSimpleGraph(); ScheduleSave(); }
 
-    private void PushMicrophone() { _router.UpdateMicrophoneMix(CurrentMicrophone()); ScheduleSave(); }
+    private void PushMicrophone() { _router.UpdateMicrophoneMix(CurrentMicrophone()); SyncSimpleGraph(); ScheduleSave(); }
 
     private void OnStatusChanged(object? sender, RouteStatusSnapshot snapshot)
     {

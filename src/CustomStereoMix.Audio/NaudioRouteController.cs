@@ -3,11 +3,54 @@ using NAudio.CoreAudioApi;
 
 namespace CustomStereoMix.Audio;
 
-public sealed class NaudioRouteController : IAudioRouteController
+public sealed class NaudioRouteController : IAudioRouteController, IAudioGraphController
 {
     private readonly NaudioDeviceService _devices;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private AudioRouteSession? _session;
+    private GraphAudioSession? _graphSession;
+    private GraphRuntimeSnapshot _lastGraphError = new(new Dictionary<string, GraphNodeMeter>(), new Dictionary<string, string>());
+    public GraphRuntimeSnapshot GraphSnapshot => _graphSession?.Snapshot ?? _lastGraphError;
+    public void UpdateGraphParameters(GraphProject graph) => _graphSession?.UpdateParameters(graph);
+
+    public async Task StartGraphAsync(GraphProject graph, AudioEngineSettings engine, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (State is RouteState.Running or RouteState.Starting) return;
+            _lastGraphError = new(new Dictionary<string, GraphNodeMeter>(), new Dictionary<string, string>());
+            AudioSettingsValidator.Validate(engine, ProcessingSettings.Default, MicMixSettings.Default);
+            if (GraphValidator.GetError(graph, true, _devices.GetRenderTargets(), _devices.GetMicrophones()) is { } issue)
+                throw new InvalidOperationException().WithMessage(issue.Key);
+            SetState(RouteState.Starting, new(MessageKey.StartingRouting));
+            var session = new GraphAudioSession(_devices, graph, engine);
+            _graphSession = session;
+            session.LevelChanged += (_, snapshot) => LevelChanged?.Invoke(this, snapshot);
+            session.Faulted += async (_, error) =>
+            {
+                await _gate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    if (!ReferenceEquals(_graphSession, session)) return;
+                    _lastGraphError = new(new Dictionary<string, GraphNodeMeter>(), session.Snapshot.Errors);
+                    try { await DisposeSessionAsync().ConfigureAwait(false); }
+                    finally { SetState(RouteState.Faulted, new(MessageKey.Detail, error)); }
+                }
+                finally { _gate.Release(); }
+            };
+            session.Start();
+            SetState(RouteState.Running, new(MessageKey.GraphRunning));
+        }
+        catch (Exception error)
+        {
+            if (_graphSession is { } failed) _lastGraphError = new(new Dictionary<string, GraphNodeMeter>(), failed.Snapshot.Errors);
+            try { await DisposeSessionAsync().ConfigureAwait(false); }
+            finally { SetState(RouteState.Faulted, new(MessageKey.Detail, error)); }
+            throw;
+        }
+        finally { _gate.Release(); }
+    }
 
     public NaudioRouteController(NaudioDeviceService devices)
     {
@@ -77,7 +120,8 @@ public sealed class NaudioRouteController : IAudioRouteController
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_session is null)
+            _lastGraphError = new(new Dictionary<string, GraphNodeMeter>(), new Dictionary<string, string>());
+            if (_session is null && _graphSession is null)
             {
                 SetState(RouteState.Stopped, new(MessageKey.Ready));
                 return;
@@ -106,6 +150,9 @@ public sealed class NaudioRouteController : IAudioRouteController
 
     private async Task DisposeSessionAsync()
     {
+        var graph = _graphSession;
+        _graphSession = null;
+        if (graph is not null) await graph.DisposeAsync().ConfigureAwait(false);
         var session = _session;
         _session = null;
         if (session is not null) await session.DisposeAsync().ConfigureAwait(false);

@@ -12,17 +12,20 @@ import {
   request,
   subscribeState,
   readState,
-  subscribeMeter,
-  readMeter,
 } from "./bridge";
 import { Icon } from "./icons";
 import type { AppState, Command, Device, Patch, Settings } from "./types";
+import { Gain, GainValue, NodeMeter } from "./advanced/AudioControls";
+import "./advanced/advanced.css";
+import { nodeName, createNode, graphError } from "./advanced/graph";
 
 const db = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)} dB`;
+const GraphWorkspace = React.lazy(() => import("./advanced/GraphWorkspace").then(module => ({ default: module.GraphWorkspace })));
 export default function App() {
   const state = useSyncExternalStore(subscribeState, readState);
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(true);
+  const [graphPending, setGraphPending] = useState(false);
   useEffect(() => {
     connect()
       .catch((e) => setError(e.message))
@@ -53,7 +56,7 @@ export default function App() {
       </main>
     );
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${state.advancedMode ? "advanced" : ""}`}>
       <header className="app-header">
         <div className="brand">
           <div className="brand-mark">
@@ -64,6 +67,9 @@ export default function App() {
             <p>{t("AppTagline")}</p>
           </div>
         </div>
+        <label className="mode-switch"><input type="checkbox" role="switch" checked={state.advancedMode}
+          disabled={state.busy || graphPending} onChange={e => act("mode", { advanced: e.target.checked })} />
+          <span className="switch-visual" aria-hidden="true" /><span>{t("AdvancedMode")}</span></label>
         <nav className="header-actions" aria-label={t("AppMenu")}>
           <span
             className={`status-chip ${state.isRouting ? "running" : ""}`}
@@ -98,7 +104,9 @@ export default function App() {
       {window.__stereoPreview && (
         <div className="preview-note">{t("PreviewBanner")}</div>
       )}
-      <main className="page-scroll">
+      {state.advancedMode && (error || state.noticeText) && <div className="notice graph-error" role="alert"><span>{error || state.noticeText}</span>
+        {error && <button className="icon-button" aria-label={t("DismissError")} onClick={() => setError("")}><Icon name="close" /></button>}</div>}
+      {state.advancedMode ? <React.Suspense fallback={<main className="loading"><p>{t("Working")}</p></main>}><GraphWorkspace state={state} onPendingChange={setGraphPending} /></React.Suspense> : <main className="page-scroll">
         <div className="page-content">
           {(error || state.noticeText) && (
             <div className="notice" role="alert">
@@ -114,16 +122,16 @@ export default function App() {
               )}
             </div>
           )}
-          <MainPage state={state} act={act} patch={patch} />
+          <SimpleGraphPage state={state} act={act} onPendingChange={setGraphPending} />
         </div>
-      </main>
+      </main>}
       <footer className="app-footer">
-        <div className="footer-copy"><strong>{state.engineLine}</strong><span>{state.trayHint}</span></div>
+        <div className="footer-copy"><strong>{state.engineLine}{state.advancedMode && " · " + t("GraphConfiguredLatency") + " " + state.settings.latencyMilliseconds + " ms"}</strong><span>{state.trayHint}</span></div>
         <button className={`button route-action ${state.isRouting ? "danger" : "primary"}`}
-          disabled={state.busy || (state.isRouting ? !state.isStopEnabled : !state.isStartEnabled)}
+          disabled={state.busy || (!state.isRouting && graphPending) || (state.isRouting ? !state.isStopEnabled : !state.isStartEnabled)}
           onClick={() => act(state.isRouting ? "stop" : "start")}>
           <Icon name={state.isRouting ? "stop" : "play"} size={17} />
-          {t(state.busy ? "Working" : state.isRouting ? "StopRouting" : "StartRouting")}
+          {t(state.busy ? "Working" : state.advancedMode ? state.isRouting ? "GraphStopAll" : "GraphStartAll" : state.isRouting ? "StopRouting" : "StartRouting")}
         </button>
       </footer>
       <PanelDialog state={state} act={act} patch={patch} error={error} />
@@ -137,6 +145,80 @@ type Actions = {
   act: (c: Command, p?: unknown) => Promise<boolean>;
   patch: (p: Patch) => Promise<boolean>;
 };
+function SimpleGraphPage({ state, act, onPendingChange }: Pick<Actions, "state" | "act"> & { onPendingChange: (pending: boolean) => void }) {
+  const bus = state.graph.nodes.find(n => n.id === state.simpleBusId && n.kind === "bus") ?? state.graph.nodes.find(n => n.kind === "bus");
+  const draft = useRef(state.graph), queued = useRef<typeof state.graph | null>(null), sending = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [local, setLocal] = useState(state.graph);
+  const [localError, setLocalError] = useState("");
+  useEffect(() => { if (!sending.current && !queued.current) { draft.current = state.graph; setLocal(state.graph); } }, [state.graphRevision, state.graph]);
+  useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); void flush(); } }, []);
+  async function flush() {
+    timer.current = null; if (sending.current) return; sending.current = true;
+    try { while (queued.current) { const project = queued.current; queued.current = null;
+      if (!await act("graph", { revision: readState()!.graphRevision, project })) { queued.current = null; draft.current = readState()!.graph; setLocal(draft.current); break; }
+    } } finally { sending.current = false; onPendingChange(false); }
+  }
+  const update = (project: typeof state.graph) => {
+    const error = graphError(project, state);
+    if (error) { setLocalError(error); return; }
+    setLocalError(""); draft.current = project; setLocal(project); queued.current = project; onPendingChange(true);
+    if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => void flush(), 75); };
+  const current = local.nodes.find(n => n.id === bus?.id);
+  if (!current) return <div className="simple-graph-summary"><p>{t("GraphEmpty")}</p><button className="button" onClick={() => {
+    update({ ...draft.current, nodes: [...draft.current.nodes, createNode("bus", null, t("NewMix"))] });
+  }}>{t("NewMix")}</button></div>;
+  const inputs = local.edges.filter(e => e.target === current.id);
+  const outputs = local.edges.filter(e => e.source === current.id);
+  const sourceEdge = inputs.find(e => local.nodes.find(n => n.id === e.source)?.kind === "loopback");
+  const micEdge = inputs.find(e => local.nodes.find(n => n.id === e.source)?.kind === "capture");
+  const source = local.nodes.find(n => n.id === sourceEdge?.source);
+  const target = local.nodes.find(n => n.id === outputs[0]?.target);
+  const mic = local.nodes.find(n => n.id === (micEdge?.source ?? current.preferredMicrophoneId)) ?? local.nodes.find(n => n.kind === "capture");
+  const change = (patch: Partial<typeof current>) => update({ ...draft.current, nodes: draft.current.nodes.map(n => n.id === current.id ? { ...n, ...patch } : n) });
+  const choose = (kind: "loopback" | "capture" | "output", deviceId: string, enabled = true) => {
+    if (!state.canEditRoute) return;
+    const graph = draft.current;
+    let node = graph.nodes.find(n => n.kind === kind && n.deviceId === deviceId);
+    const nodes = [...graph.nodes];
+    if (!node) { node = createNode(kind, deviceId, kind === "capture" ? state.microphones.find(d => d.id === deviceId)?.name ?? t("InputAudio") : deviceId === "headphone" ? t("GraphHeadphones") : "", nodes.filter(n => kind === "output" ? n.kind === kind : n.kind === "capture" || n.kind === "loopback").length); nodes.push(node); }
+    const replaced = kind === "output" ? outputs[0] : kind === "capture" ? micEdge : sourceEdge;
+    const from = kind === "output" ? current.id : node.id, to = kind === "output" ? node.id : current.id;
+    const existing = graph.edges.find(e => e.source === from && e.target === to);
+    const edges = graph.edges.filter(e => e.id !== replaced?.id && e.id !== existing?.id);
+    if (enabled) {
+      const replacement = existing ?? { id: crypto.randomUUID(), source: from, target: to, gainDb: replaced?.gainDb ?? (kind === "capture" ? current.preferredMicrophoneGainDb ?? 0 : 0), muted: false };
+      const index = replaced ? graph.edges.findIndex(e => e.id === replaced.id) : edges.length;
+      edges.splice(Math.min(Math.max(0, index), edges.length), 0, replacement);
+    }
+    update({ ...graph, nodes: nodes.map(n => n.id === current.id && kind === "capture" ? { ...n, preferredMicrophoneId: node!.id } : n), edges });
+  };
+  const micEnabled = !!micEdge;
+  return <div className="simple-graph-summary">
+    {localError && <div className="notice" role="alert"><span>{localError}</span><button className="icon-button" aria-label={t("DismissError")} onClick={() => setLocalError("")}><Icon name="close" /></button></div>}
+    <div className="section-heading"><h2>{t("AudioRouting")}</h2>
+      {local.nodes.filter(n => n.kind === "bus").length > 1 && <select className="simple-mix-picker" aria-label={t("MixBus")} value={current.id}
+        onChange={e => act("simpleBus", { id: e.target.value })}>{local.nodes.filter(n => n.kind === "bus").map(n => <option key={n.id} value={n.id}>{nodeName(n)}</option>)}</select>}
+      <button className="button small" disabled={!state.canEditRoute} onClick={() => act("refresh")}><Icon name="refresh" size={14} />{t("Refresh")}</button></div>
+    <div className="route-grid"><section className="card"><DeviceSelect label={t("PlaybackSource")} icon="speaker" devices={state.sources}
+      selected={source?.deviceId ?? null} disabled={!state.canEditRoute} onChange={id => choose("loopback", id)} /></section>
+      <span className="route-arrow" aria-hidden="true">→</span><section className="card"><DeviceSelect label={t("OutputTarget")} icon="cable" devices={state.targets}
+      selected={target?.deviceId ?? null} disabled={!state.canEditRoute} onChange={id => choose("output", id)} /></section></div>
+    <p className="caption route-help">{t("CableInputHint")}</p>
+    {(inputs.length > Number(!!sourceEdge) + Number(!!micEdge) || outputs.length > 1) && <p className="caption">{t("GraphAdditionalRoutes", Math.max(0, inputs.length - Number(!!sourceEdge) - Number(!!micEdge)), Math.max(0, outputs.length - 1))}</p>}
+    <section className="card signal-card"><div className="signal-heading"><strong>{nodeName(current)} · {t("SignalMonitor")}</strong></div><div className="simple-node-meter"><NodeMeter id={current.id} /></div></section>
+    <div className="gain-row"><span className="field-title">{t("OutputGain")}</span><Gain value={current.gainDb} label={t("OutputGain")} onChange={gainDb => change({ gainDb })} /><GainValue value={current.gainDb} label={t("GraphGainValue")} onChange={gainDb => change({ gainDb })} /></div>
+    <section className="card mic-card"><Switch label={t("IncludeMicrophone")} icon="mic" value={micEnabled} disabled={!state.canEditRoute || !state.microphones.length}
+      onChange={enabled => { if (enabled) { const id = mic?.deviceId ?? state.microphones.find(d => d.isDefault)?.id ?? state.microphones[0]?.id; if (id) choose("capture", id); }
+        else update({ ...draft.current, nodes: draft.current.nodes.map(n => n.id === current.id ? { ...n, preferredMicrophoneId: mic?.id, preferredMicrophoneGainDb: micEdge?.gainDb ?? 0 } : n), edges: draft.current.edges.filter(e => e.id !== micEdge?.id) }); }} />
+      {micEnabled && <div className="mic-details"><DeviceSelect label={t("Microphone")} icon="mic" devices={state.microphones} selected={mic?.deviceId ?? null}
+        disabled={!state.canEditRoute} onChange={id => choose("capture", id)} /><div className="gain-row"><Gain value={micEdge!.gainDb} label={t("MicrophoneGain")}
+          onChange={gainDb => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === micEdge!.id ? { ...e, gainDb } : e) })} />
+          <GainValue value={micEdge!.gainDb} label={t("MicrophoneGain")} onChange={gainDb => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === micEdge!.id ? { ...e, gainDb } : e) })} /></div></div>}
+    </section>
+    {local.nodes.filter(n => n.kind === "bus").length > 1 && <p className="caption">{t("GraphRunningOthers")}</p>}
+  </div>;
+}
 function PanelDialog({ state, act, patch, error }: Actions & { error: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -267,6 +349,7 @@ function DeviceSelect({
         <option value="" disabled>
           {devices.length ? t("SelectDevice") : t("NoDevices")}
         </option>
+        {selected && !current && <option value={selected}>{t("GraphOffline")}</option>}
         {devices.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name}
@@ -277,144 +360,6 @@ function DeviceSelect({
         {current?.summary ?? t("RefreshDeviceHint")}
       </span>
     </div>
-  );
-}
-function MainPage({ state, act, patch }: Actions) {
-  return (
-    <>
-      <div className="section-heading">
-        <h2>{t("AudioRouting")}</h2>
-        <button
-          className="button small"
-          disabled={!state.canEditRoute}
-          onClick={() => act("refresh")}
-        >
-          <Icon name="refresh" size={14} />
-          {t("Refresh")}
-        </button>
-      </div>
-      <div className="route-grid">
-        <section className="card">
-          <DeviceSelect
-            label={t("PlaybackSource")}
-            icon="speaker"
-            devices={state.sources}
-            selected={state.sourceDeviceId}
-            disabled={!state.canEditRoute}
-            onChange={(sourceDeviceId) => patch({ sourceDeviceId })}
-          />
-        </section>
-        <span className="route-arrow" aria-hidden="true">
-          →
-        </span>
-        <section className="card">
-          <DeviceSelect
-            label={t("OutputTarget")}
-            icon="cable"
-            devices={state.targets}
-            selected={state.targetDeviceId}
-            disabled={!state.canEditRoute}
-            onChange={(targetDeviceId) => patch({ targetDeviceId })}
-          />
-        </section>
-      </div>
-      <p className="route-help caption">{state.targetMessage}</p>
-      <SignalMonitor />
-      <div className="gain-row">
-        <span className="field-title">{t("OutputGain")}</span>
-        <Range
-          label={t("OutputGain")}
-          value={state.settings.gainDb}
-          min={-12}
-          max={12}
-          disabled={!state.canEditSettings}
-          onChange={(gainDb) => patch({ gainDb })}
-        />
-        <output>{db(state.settings.gainDb)}</output>
-      </div>
-      <section className="card mic-card">
-        <Switch
-          label={t("IncludeMicrophone")}
-          icon="mic"
-          value={state.settings.isMicMixEnabled}
-          disabled={!state.canEditRoute}
-          onChange={(isMicMixEnabled) => patch({ isMicMixEnabled })}
-        />
-        {state.settings.isMicMixEnabled && (
-          <div className="mic-details">
-            <DeviceSelect
-              label={t("Microphone")}
-              icon="mic"
-              devices={state.microphones}
-              selected={state.microphoneDeviceId}
-              disabled={!state.canEditRoute}
-              onChange={(microphoneDeviceId) => patch({ microphoneDeviceId })}
-            />
-            <div className="gain-row">
-              <Range
-                label={t("MicrophoneGain")}
-                value={state.settings.micGainDb}
-                min={-12}
-                max={12}
-                disabled={!state.canEditSettings}
-                onChange={(micGainDb) => patch({ micGainDb })}
-              />
-              <output>{db(state.settings.micGainDb)}</output>
-            </div>
-          </div>
-        )}
-      </section>
-    </>
-  );
-}
-function SignalMonitor() {
-  const meter = useSyncExternalStore(subscribeMeter, readMeter);
-  const values = meter.samples.length ? meter.samples : Array(96).fill(0);
-  return (
-    <section className="card signal-card" aria-label={t("OutputMonitor")}>
-      <div className="signal-heading">
-        <div>
-          <strong>{t("SignalMonitor")}</strong>
-          <span className="caption">{meter.signalState}</span>
-        </div>
-        <output className="level" aria-label={t("SignalLevel")}>
-          {Math.round(meter.levelPercent)}%
-        </output>
-      </div>
-      <svg
-        viewBox="0 0 640 64"
-        preserveAspectRatio="none"
-        className="waveform"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id="wave-blue" x1="0" y1="1" x2="0" y2="0">
-            <stop stopColor="#ADC7FF" />
-            <stop offset="1" stopColor="#416FF2" />
-          </linearGradient>
-        </defs>
-        {[16, 32, 48].map((y) => (
-          <line key={y} x1="0" x2="640" y1={y} y2={y} stroke="#EDF1F8" />
-        ))}
-        {values.map((n, i) => {
-          const h = Math.max(2, Math.min(1, n) * 60);
-          return (
-            <rect
-              key={i}
-              x={(i * 640) / values.length}
-              y={64 - h}
-              width={Math.max(1, 640 / values.length - 2)}
-              height={h}
-              rx="1"
-              fill="url(#wave-blue)"
-            />
-          );
-        })}
-      </svg>
-      <div className="level-track">
-        <span style={{ width: `${Math.min(100, meter.levelPercent)}%` }} />
-      </div>
-    </section>
   );
 }
 function Switch({
@@ -576,6 +521,13 @@ function Numeric({
   );
 }
 function SettingsPage({ state, act, patch }: Actions) {
+  const processingBus = state.graph.nodes.find(n => n.id === state.simpleBusId && n.kind === "bus") ?? state.graph.nodes.find(n => n.kind === "bus");
+  const processing = processingBus ?? state.settings;
+  const patchProcessing = (values: { compressorEnabled?: boolean; compressorThresholdDb?: number; compressorRatio?: number }) => {
+    const latest = readState()!;
+    return act("graph", { revision: latest.graphRevision, project: { ...latest.graph,
+      nodes: latest.graph.nodes.map(n => n.id === processingBus?.id ? { ...n, ...values } : n) } });
+  };
   const [resetOpen, setResetOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -645,41 +597,41 @@ function SettingsPage({ state, act, patch }: Actions) {
         <Switch
           label={t("ReduceLoudSounds")}
           description={t("CompressorHint")}
-          value={state.settings.compressorEnabled}
-          disabled={!state.canEditSettings}
-          onChange={(compressorEnabled) => patch({ compressorEnabled })}
+          value={processing.compressorEnabled}
+          disabled={!state.canEditSettings || !processingBus}
+          onChange={(compressorEnabled) => patchProcessing({ compressorEnabled })}
         />
-        {state.settings.compressorEnabled && (
+        {processing.compressorEnabled && (
           <div className="two-fields">
             <label className="slider-field">
               <span className="caption">
                 {t(
                   "ThresholdValue",
-                  state.settings.compressorThresholdDb.toFixed(1),
+                  processing.compressorThresholdDb.toFixed(1),
                 )}
               </span>
               <Range
                 label={t("CompressorThreshold")}
-                value={state.settings.compressorThresholdDb}
-                min={-40}
-                max={-3}
+                value={processing.compressorThresholdDb}
+                min={-60}
+                max={0}
                 disabled={!state.canEditSettings}
                 onChange={(compressorThresholdDb) =>
-                  patch({ compressorThresholdDb })
+                  patchProcessing({ compressorThresholdDb })
                 }
               />
             </label>
             <label className="slider-field">
               <span className="caption">
-                {t("RatioValue", state.settings.compressorRatio.toFixed(1))}
+                {t("RatioValue", processing.compressorRatio.toFixed(1))}
               </span>
               <Range
                 label={t("CompressorRatio")}
-                value={state.settings.compressorRatio}
+                value={processing.compressorRatio}
                 min={1}
-                max={10}
+                max={20}
                 disabled={!state.canEditSettings}
-                onChange={(compressorRatio) => patch({ compressorRatio })}
+                onChange={(compressorRatio) => patchProcessing({ compressorRatio })}
               />
             </label>
           </div>
