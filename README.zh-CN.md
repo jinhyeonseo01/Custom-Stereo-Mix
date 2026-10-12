@@ -1,180 +1,120 @@
-<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mix 图标" /></p>
+<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mix" /></p>
 <h1 align="center">Custom Stereo Mix</h1>
 <p align="center"><a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · 简体中文</p>
-<p align="center">Windows 自定义立体声混音 — 将电脑播放声音与麦克风传送到 Discord、OBS、录音及 STT 应用</p>
-<p align="center"><a href="#quick-start">快速开始</a> · <a href="#installation">安装</a> · <a href="#build">构建</a> · <a href="#troubleshooting">故障排查</a></p>
-<p align="center"><img src="docs/images/main-window.png" width="760" alt="立体声混音界面：播放设备、目标设备、信号监视器、音量和麦克风混音" /></p>
-<p align="center"><sub>截图展示韩语界面和真实 Windows 设备。设备名称因电脑而异。</sub></p>
+<p align="center">将Windows播放音频与输入组合成多个混音组，发送到所需输出。</p>
+<p align="center"><a href="#quick-start">快速开始</a> · <a href="#advanced">高级模式</a> · <a href="#installation">安装</a> · <a href="#build">构建</a> · <a href="#troubleshooting">故障排查</a></p>
 
-**Custom Stereo Mix 是为 Windows 提供立体声混音功能的桌面应用。** 即使声卡没有内置“立体声混音”输入，也能捕获所选耳机或扬声器的播放声音，通过虚拟音频线传送到其他应用。还可混入真实麦克风，将电脑声音和人声合并为一个输入。
+![多个输入、混音组和输出的高级模式](docs/images/advanced-mode.png)
+
+*截图来自当前2.0浏览器UI预览，设备和电平为示例。实际音频由Windows桌面应用处理，以下截图同样来自预览。*
+
+Custom Stereo Mix是一款**将PC播放音频、麦克风和虚拟输入混合后发送到多个输出设备的Windows应用**。简易模式保留播放转发与麦克风控制，高级模式通过节点和连接线配置多个混音组。使用虚拟音频线时，Discord、OBS、录音或STT应用可将混音作为输入。
+
+本README针对**2.0.0源码版本**。已完成检查和剩余稳定性验证见[验证记录](docs/VALIDATION.md)。
 
 ## 主要功能
 
-- **自定义立体声混音** — 捕获所选设备的播放声音，用作 Discord、OBS、录音或语音转文字应用的输入。
-- **电脑声音 + 麦克风** — 可选混入真实麦克风，分别调节音量。
-- **信号监视与处理** — 实时信号显示、输出音量、可选压缩器和最终限幅器。
-- **托盘运行** — 关闭或最小化窗口后保持连接，可从托盘开始、停止或退出。
-- **设置自动保存** — 保存设备 ID，备份正常设置，支持损坏恢复与重置。
-- **内置指南** — 首次启动说明，以及随时可重新打开的虚拟音频线设置指南。
-- **四种语言** — 韩语、英语、日语和简体中文，可在安装时或应用设置中选择。
-
-> **使用前需要额外设置：** 使用立体声混音前，必须**另外安装虚拟音频线**，将播放输出连接到录音输入。可使用 VB-CABLE、VAC 或其他提供配对播放与录音设备的产品。此安装程序未捆绑虚拟音频驱动。
+| 功能 | 用途 |
+|---|---|
+| 简易模式 | 基本播放/输出连接、可选麦克风、混音选择和音量 |
+| 高级模式 | 多个播放音频及物理/虚拟输入 → 多个混音组 → 多个输出 |
+| 混音控制 | 每条发送的增益/静音、主音量、可选混音器面板 |
+| 声音处理 | 压缩器、混音/输出限幅器、电平、削波和设备错误 |
+| 图编辑 | 设备搜索、端口拖拽、详情面板、自动排列、缩放、撤销/重做 |
+| 项目 | JSON导入/导出、自动保存、1.x设置迁移及备份 |
+| 应用行为 | 托盘、可选登录自启动、更新检查 |
+| 语言 | 韩语、英语、日语、简体中文 |
 
 <a id="quick-start"></a>
-## 立体声混音快速开始
 
-1. 从 [VB-CABLE 官方页面](https://vb-audio.com/Cable/)安装虚拟音频线，按照官方说明使用管理员权限安装并重启电脑。
-2. 在此应用的**播放声音**中，选择实际正在播放声音的耳机或扬声器。
-3. 在**目标设备**中选择 `CABLE Input`，然后点击**开始音频连接**。
-4. 在 Discord、OBS、录音或 STT 等接收应用中，将**输入设备**设为 `CABLE Output`。
+## 从简易模式开始
+
+1. 如需发送到其他应用的输入，单独安装[VB-CABLE](https://vb-audio.com/Cable/)等虚拟音频线。普通扬声器/耳机输出无需安装。
+2. 选择实际正在播放声音的设备作为播放来源。
+3. 选择目标输出；VB-CABLE使用 `CABLE Input`。
+4. 如需加入人声，启用麦克风混音并选择设备和音量。
+5. 开始连接。接收应用选择配对的录音端；VB-CABLE使用 `CABLE Output`。
 
 ```text
-耳机 / 扬声器播放声音
-  → Custom Stereo Mix [可选麦克风混音]
-  → CABLE Input  [播放设备]
-  → CABLE Output [录音设备]
-  → Discord / OBS / 录音 / STT
+PC播放音频 + 麦克风 → Custom Stereo Mix → CABLE Input
+  → CABLE Output → Discord / OBS / 录音 / STT
 ```
 
-其他虚拟音频线也可按同样方式连接：发送到其播放设备，在接收应用中选择配对录音设备。为防止反馈，应用会拒绝连接到同一设备，或将虚拟音频线的录音输入再次用作麦克风混音。
+![简易模式的播放转发和麦克风开关](docs/images/simple-mode.png)
 
-<a id="installation"></a>
-## 安装
+有多个混音组时，选择要操作的混音组。简易模式编辑基本连接，同时保留额外输入、输出和其他混音组。**切换模式不会停止音频。**
 
-| 所需组件 | 说明 |
-| --- | --- |
-| Windows x64 | 当前支持的分发平台。 |
-| WebView2 Runtime | 桌面界面所需。如果缺失，安装程序会运行 Microsoft 官方运行时安装程序。 |
-| 虚拟音频线 | 需要单独安装，此安装程序未包含音频驱动。 |
-| .NET Runtime | 已包含在分发构建中，运行应用无需安装 .NET SDK。 |
+<a id="advanced"></a>
 
-可从 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)下载安装程序，或[从源码构建](#build)。推送 `vX.Y.Z` 标签后，GitHub Actions 会创建发布。
+## 高级模式
 
-- 安装程序：`artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
-- 文件夹分发：运行 `artifacts\webview2\CustomStereoMix.App.exe`
+打开顶部开关后：
 
-应用安装在当前用户目录。需要安装 WebView2 时必须联网。VB-CABLE 驱动安装另需管理员权限。
+1. 从节点添加或设备列表加入播放、输入、混音与输出节点。
+2. 将来源右侧端口拖到混音左侧端口，再将混音连接到输出。详情中的目标选择器也可建立连接。
+3. 在混音节点内调节各输入的发送增益与静音。同一输入可进入多个混音组，同一混音可送往多个输出。
+4. **…**打开设备与处理参数。点击连接线可调节其发送音量、静音或删除。
+5. 使用全部开始/全部停止控制已连接的混音组。
 
-**文件夹分发时，请提供完整的 `artifacts\webview2` 目录。** 除可执行文件外，还需要 `wwwroot`、WebView2 加载器及其他 DLL。
+**音量滑块中央为0 dB**。左半段为-60..0 dB，右半段为0..+12 dB，支持直接输入数字。双击或按 `0` 重置，方向键调整0.1 dB，Shift+方向键调整1 dB。
 
-## 界面、语言和设置
-
-浅色界面默认大小为 760 × 730。窗口较小时可滚动内容，开始和停止按钮始终保留在底部。
-
-| 功能 | 行为 |
-| --- | --- |
-| 使用指南 | 位于设置按钮左侧。首次启动自动显示，默认勾选的**不再显示**会在关闭指南时保存。仍可随时手动打开。 |
-| 使用系统托盘 | 默认启用。关闭和最小化会隐藏窗口并保持音频连接。托盘的**退出**始终真正退出应用；禁用后关闭按钮也会退出。 |
-| 重置设置 | 确认后停止连接并恢复默认值，取消则保持现有状态。 |
-| 检查更新 | 位于设置顶部，检查 GitHub 最新正式版本并提供安装程序及更新内容。 |
-| 显示语言 | 位于设置 → 应用行为。立即更新界面、托盘和说明，音频连接保持运行。 |
-
-安装开始时可选择语言。优先级为**已保存语言 → 安装时选择的语言 → Windows 显示语言 → 英语**。重新安装会保留在应用中选择的语言。重置后恢复安装语言；文件夹分发使用受支持的 Windows 显示语言作为默认值。
+运行中可调整增益、静音和处理参数。**设备、节点与连接结构须停止后修改。**重复输出以及返回同一播放设备/虚拟音频线的已检测路径会被拒绝。
 
 <details>
-<summary>查看设置截图</summary>
+<summary>所选混音组的混音器面板</summary>
 
-![更新、托盘和声音处理设置](docs/images/settings.png)
+![输入推子、电平、静音和主音量](docs/images/mixer.png)
 
-音频引擎与重置设置位于下方，可滚动查看。截图为韩语界面。
+工具栏混音器按钮打开该面板，其参数与节点内控制同步。
+
 </details>
 
+工具栏支持项目JSON导入/导出。设备按Windows endpoint ID保存，因此在其他PC导入后可能需要重新指定设备。
+
+<a id="installation"></a>
+
+## 安装和运行
+
+已发布安装包见[GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)。修改源码版本本身不会发布新版本。
+
+- 需要Windows x64及WebView2 Runtime。缺失时，安装程序会安装Microsoft官方运行时。
+- 文件夹分发运行 `artifacts\webview2\CustomStereoMix.App.exe`，必须保留含 `wwwroot` 和DLL的**整个文件夹**。
+- 虚拟驱动不随应用提供。self-contained分发包含.NET运行时。
+- 默认关闭/最小化会隐藏到托盘并保持音频。真正退出使用**托盘 → 退出**。
+- 托盘和登录自启动可在设置中调整。自启动只打开应用，音频发送须手动开始。
+
 <details>
-<summary>查看指南截图</summary>
+<summary>设置和使用指南</summary>
 
-![虚拟音频线安装和输入输出设备选择指南](docs/images/usage-guide.png)
+![更新、自启动、语言和托盘设置](docs/images/settings.png)
 
-“安装页面”按钮会打开官方网站，指南内容本身可离线查看。
+![虚拟音频线连接指南](docs/images/usage-guide.png)
+
+向下滚动设置可查看声音处理、引擎和重置。切换语言会立即更新界面和托盘，不会停止音频。
+
 </details>
 
 <a id="build"></a>
+
 ## 从源码构建
 
-所有命令都在**此 README 所在的仓库根目录，使用 PowerShell**执行。
-
-| 工具 | 用途 |
-| --- | --- |
-| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | C# 构建。`global.json` 选择 10.0.301 或兼容的更新 .NET 10 SDK。 |
-| [Node.js / npm](https://nodejs.org/en/download/) | React 界面和图标构建，推荐 Node.js 24。 |
-| [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) | 开发时运行桌面应用。 |
-| [Inno Setup 7](https://jrsoftware.org/isdl.php) | 构建四种语言的 Windows 安装程序。 |
-
-首次构建需要联网恢复 NuGet 与 npm 依赖。被删除的缓存与依赖会在需要时重新生成。
-
-### 构建和运行
+准备.NET 10 SDK（`global.json`: 10.0.301）、Node.js 24/npm及WebView2 Runtime，在项目根目录PowerShell中运行：
 
 ```powershell
 dotnet build CustomStereoMix.slnx -c Release
-dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Release
+dotnet run --project src\CustomStereoMix.App -c Release
 ```
 
-应用项目已连接 npm 依赖恢复和 React 生产构建，构建 C# 时会自动构建界面。
+C#构建自动执行npm恢复和React构建。
 
-### 使用便捷脚本构建分发版本
+| 任务 | 命令 | 产物 |
+|---|---|---|
+| 文件夹分发 | `.\build_exe.ps1` | `artifacts\webview2\` |
+| 安装包 | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.0-Setup-x64.exe` |
 
-```powershell
-.\build_exe.ps1
-```
+安装包需要Inno Setup 7。自定义路径使用 `-IsccPath 'C:\path\ISCC.exe'`。默认版本位于 `Directory.Build.props`。仅修改应用图标源文件时使用 `-RegenerateIcons`。自动发布见[发布指南](docs/RELEASING.md)。
 
-构建使用已提交的图标。修改图标源文件后，可使用 `-RegenerateIcons` 或 `tools/build_icons.ps1` 重新生成。
-
-脚本依次检查 npm 依赖、构建 React，再执行 `dotnet publish`。它只是便捷工具，并非必须使用的独立构建系统。结果输出到 `artifacts\webview2\`，为包含 .NET 的 Windows x64 分发版本。
-
-### 直接执行发布命令
-
-```powershell
-dotnet publish src\CustomStereoMix.App\CustomStereoMix.App.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained true `
-  -o artifacts\webview2
-```
-
-此命令自动构建 React，并使用仓库中已有的图标。如果修改了图标源文件或生成逻辑，请先运行：
-
-```powershell
-.\tools\build_icons.ps1
-```
-
-### 生成安装程序
-
-Inno Setup 位于默认安装路径或 PATH 中时：
-
-```powershell
-.\build_installer.ps1
-```
-
-编译器位于其他位置时：
-
-```powershell
-.\build_installer.ps1 -IsccPath 'C:\Program Files\Inno Setup 7\ISCC.exe'
-```
-
-脚本先发布应用，再下载并验证 Microsoft 签名的官方 WebView2 引导安装程序，最后生成安装程序。Inno Setup 7 提供四种安装界面翻译。
-
-| 产物 | 默认路径 |
-| --- | --- |
-| 应用及必需文件 | `artifacts\webview2\` |
-| Windows x64 安装程序 | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
-
-默认版本由 `Directory.Build.props` 管理。安装脚本的 `-Version` 参数可覆盖应用版本和安装程序版本。
-
-### 通过标签自动发布
-
-[GitHub Actions 工作流](.github/workflows/release.yml)会检出标签指向的提交并在 Windows 上构建。提交并推送代码后：
-
-```powershell
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
-```
-
-标签版本会应用到程序和安装文件名。测试通过后，使用 Inno Setup 构建，将安装程序及 SHA-256 文件上传到发布草稿，然后公开发布。未完成的草稿不会出现在更新提示中，已公开的同版本发布不会被覆盖。
-
-工作流使用 GitHub 自动提供的 `GITHUB_TOKEN`，无需个人访问令牌。重试步骤见[发布指南](docs/RELEASING.md)（韩语）。
-
-### Visual Studio 与界面开发
-
-可在支持 .NET 10 的 Visual Studio 中打开 `CustomStereoMix.slnx`，使用 Release 构建。环境需能执行 `dotnet` 和 `npm`。文件夹发布选择 Release / win-x64 / self-contained；安装程序另行运行脚本生成。
+### UI预览和测试
 
 ```powershell
 cd ui
@@ -182,70 +122,41 @@ npm ci
 npm run dev
 ```
 
-浏览器预览使用模拟设备和信号，并显示预览提示。真实音频连接在桌面应用中运行。预览桥接代码不会包含在生产包中。
+打开 `http://127.0.0.1:5173/?advanced`。**浏览器使用示例设备和电平，不连接真实音频。**预览桥接不会进入生产包。
 
-### 测试
+回到项目根目录运行：
 
 ```powershell
-dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devices
 ```
 
-测试覆盖重采样连续性与滤波、环绕声缩混、缓冲区、反馈阻止、设置保存与恢复、桥接验证、开始/重置/退出竞态、更新检查和语言保存。还需在目标电脑上检查实际设备与接收应用。
+测试覆盖图验证、反馈、混音、输出缓冲、设置迁移/保存、桥接、翻译和更新。实际设备静音会话命令及尚未完成的听音/长时间验证见[验证记录](docs/VALIDATION.md)。
 
 <a id="troubleshooting"></a>
+
 ## 故障排查
 
-| 症状 | 检查内容 |
-| --- | --- |
-| 监视器有信号，但 Discord/STT 无声 | 接收应用应选择配对的**录音设备**。VB-CABLE 对应 `CABLE Output`。监视器无法验证接收应用的设置。 |
-| 信号一直为 0% | 选择实际正在播放的设备。保存的设备 ID 不会自动跟随 Windows 默认设备更改。 |
-| 列表中没有设备 | 安装音频线、重启后刷新。已知虚拟音频线录音输入会从麦克风列表排除，以防反馈。 |
-| 声音断续 | 停止连接后检查延迟和缓冲区。缓冲区不能小于延迟；默认 48 kHz、立体声、50 ms 延迟、250 ms 缓冲区。 |
-| 关闭窗口后继续运行 | 默认托盘行为。托盘右键 → 退出，或在设置中禁用托盘。 |
-| 界面无法打开 | 检查完整分发目录是否包含 `wwwroot` 和 DLL，确认已安装 WebView2 Runtime。界面进程故障可通过重试恢复。 |
-| 构建提示文件被占用 | 退出从该输出目录运行的应用。如果 npm 恢复时出现原生文件锁定，也请停止开发服务器。 |
+| 症状 | 检查 |
+|---|---|
+| 接收应用无声 | 选择音频线的录音端，如 `CABLE Output` |
+| 播放电平不动 | 选择实际播放设备；保存的选择不会自动跟随Windows默认设备变化 |
+| 设备缺失/离线 | 停止后刷新，不会自动替换成相似名称；物理与虚拟输入都会列出 |
+| 返回路径错误 | 避免送回同一设备/音频线，同时检查外部应用路由 |
+| 部分输出失败 | 检查节点错误和设备占用，其他正常输出可以继续 |
+| 卡顿/延迟 | 停止后调整延迟/缓冲；默认48 kHz、立体声、50 ms / 250 ms |
+| 界面/构建失败 | 检查WebView2和完整分发目录，重建前关闭占用文件的应用 |
 
-## 更新
+当前不支持自动重连、应用级捕获、EQ、混音组间连接和运行中的结构编辑。
 
-界面准备完成后，每次启动会在后台检查一次 GitHub Releases。只有更高的正式 `vX.Y.Z` 版本且 Windows x64 安装程序已就绪时才弹出提示。点击**稍后**关闭后，仍可从设置中的**检查更新**重新查询。
+## 设置、诊断和贡献
 
-**下载安装程序**会在应用内显示进度并使用 SHA-256 验证。完成并确认后，应用停止音频传输、保存设置、退出并自动启动安装程序。安装完成后可重新运行应用。手动启动的安装程序也会提示关闭正在运行的应用，包括托盘中的应用。**查看更新内容**打开发布页面。
+设置为 `%APPDATA%\CustomStereoMix\settings.json`，正常备份为 `.bak`，首次1.x迁移备份为 `.v1.bak`。同目录的 `audio-diagnostics.log` 记录设备、格式、缓冲，不保存音频。WebView2配置位于 `%LOCALAPPDATA%\CustomStereoMix\WebView2`。
 
-开始菜单快捷方式和 Windows 登录时启动是独立的安装选项。自动启动也可在设置中切换，升级时保留当前选择；卸载时仅删除此应用的 Run 和 StartupApproved 项。自动启动仅打开应用，音频传输需手动开始。使用说明和设置以弹出面板显示，按 Esc 或关闭即可返回。
+报告问题时提供应用/Windows版本、设备名称、复现步骤与节点错误。共享日志前检查设备ID等不想公开的信息。
 
-## 设置和诊断
+[项目结构](docs/PROJECT_STRUCTURE.md) · [翻译扩展](docs/LOCALIZATION.md) · [验证](docs/VALIDATION.md) · [发布](docs/RELEASING.md)
 
-| 数据 | 保存位置 |
-| --- | --- |
-| 设置 | `%APPDATA%\CustomStereoMix\settings.json` |
-| 上一次正常设置 | `%APPDATA%\CustomStereoMix\settings.json.bak` |
-| 音频诊断日志 | `%APPDATA%\CustomStereoMix\audio-diagnostics.log` |
-| WebView2 配置 | `%LOCALAPPDATA%\CustomStereoMix\WebView2` |
+UI使用React、TypeScript、React Flow，宿主使用WPF、WebView2，音频使用NAudio/WASAPI。PCM在C#处理，桥接仅传递命令、状态和电平。
 
-更改后短暂延迟以及停止、退出时会自动保存设置。日志记录设备 ID、格式和缓冲区状态，不保存捕获的音频，约 1 MB 时轮换。静音播放中的 underrun 可能只是没有 WASAPI 数据包，需结合信号和发生时间判断。
-
-## 技术与翻译
-
-| 组件 | 作用 |
-| --- | --- |
-| C# / .NET 10 / NAudio | WASAPI 捕获与输出、格式转换、重采样、混音和 DSP。 |
-| React / TypeScript / Vite | 界面与用户命令。 |
-| WPF / WebView2 | 桌面窗口、本地界面、托盘和退出处理。 |
-| Lucide | 按钮图标、应用图标和 favicon。 |
-| Inno Setup | Windows x64 用户级安装程序。 |
-
-PCM 音频由 C# 处理，界面桥接只传送命令、状态和电平数据，因此刷新或隐藏界面不会停止音频。详见[项目结构](docs/PROJECT_STRUCTURE.md)和[翻译扩展说明](docs/LOCALIZATION.md)。
-
-翻译使用 C# 与 React 共用的固定键和参数。添加资源可注册更多应用语言，安装程序的语言需另外添加。Windows 提供的设备名称保持原样。
-
-## 问题反馈与贡献
-
-反馈时请提供 Windows 和应用版本、播放/目标/接收设备名称、复现步骤和症状。分享诊断日志前请检查设备 ID 等不希望公开的信息。修改后运行相关测试，并检查小窗口、托盘、设置与指南。
-
-`.gitignore` 排除依赖、构建输出、安装程序、本地设置、日志、录音和密钥。源码、锁文件、文档截图与第三方许可证包含在仓库中。
-
-## 第三方组件
-
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)和 [licenses](licenses/) 包含第三方声明。Lucide 的 ISC 及源自 Feather 的 MIT 声明位于 [LUCIDE-LICENSE.txt](ui/public/LUCIDE-LICENSE.txt)。
-
-虚拟音频驱动是独立产品，安装、使用及再分发应遵守各厂商规定。VB-CABLE 的 donationware 和捆绑条件请参阅 [VB-Audio 官方许可说明](https://vb-audio.com/Services/licensing.htm)。
+第三方许可见[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)及[licenses](licenses/)。UI图标使用Material Symbols，现有应用图标/favicon使用Lucide。虚拟驱动遵循各厂商的安装、使用和分发条款。

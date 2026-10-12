@@ -1,43 +1,71 @@
 # 프로젝트 구조
 
+## 구성
+
+| 경로 | 역할 |
+|---|---|
+| `ui/` | React·TypeScript UI, React Flow 그래프, Material Symbols 로컬 폰트 |
+| `locales/` | C#·React 공통 메시지 키와 번역 |
+| `src/CustomStereoMix.App/` | WPF 창, WebView2 호스트, 트레이, 자동 실행·업데이트 설치 |
+| `src/CustomStereoMix.State/` | 공통 프로젝트 상태, UI 명령, 저장 예약과 JSON 브리지 |
+| `src/CustomStereoMix.Core/` | 그래프·장치·설정 모델, 검증·이관, 서비스 인터페이스 |
+| `src/CustomStereoMix.Audio/` | WASAPI 장치·세션, 공유 캡처, 믹싱, 리샘플링·DSP·저장소 |
+| `tests/CustomStereoMix.Tests/` | 자동 회귀 검사와 선택 실행하는 실제 장치 검사 |
+| `installer/`, `tools/` | Inno Setup 설치기, 릴리즈 게시, 앱 아이콘 생성 도구 |
+| `docs/` | 구조·번역·배포·검증 문서와 README용 현재 화면 |
+| `licenses/` | 배포에 포함하는 외부 라이선스 |
+
+Core와 State는 WPF·NAudio에 의존하지 않는다. App은 상태와 인터페이스를 조작하고, 장치 수명은 Audio의 컨트롤러·세션이 관리한다. 기존 1.x `RouteConfig`·세션은 호환 경로로 남아 있고 데스크톱의 2.0 시작 명령은 그래프 컨트롤러를 사용한다.
+
+## 공통 프로젝트
+
+`GraphProject` schemaVersion 2는 노드·간선과 위치, 이름, 장치 ID, 게인·뮤트·보정 설정을 저장한다. 노드는 `loopback`, `capture`, `bus`, `output`의 네 종류다. 연결은 소스 → 버스 → 출력으로 제한한다. 현재 한 프로젝트의 검증 한도는 노드 128개·간선 512개다.
+
+`GraphValidator`는 값 범위, ID, 연결 역할, 중복 출력과 순환 경로를 검사한다. 동일 재생 endpoint의 loopback 반환과 가상 케이블의 반환 그룹을 그래프에 추가해 전체 믹스의 순환을 확인한다. 가상 케이블 그룹은 알려진 이름·드라이버 종류를 사용하는 휴리스틱이다. 외부 앱의 연결이나 모든 드라이버 내부 경로를 알아내지는 못한다.
+
+`GraphMigration`은 기존 재생음·선택 마이크·출력을 기본 그래프로 바꾸고 볼륨·컴프레서·리미터와 꺼진 마이크 선호 설정을 보존한다. 최초 저장 시 `settings.json.v1.bak`를 남기며 이후 저장으로 덮어쓰지 않는다.
+
+간편·고급모드는 같은 그래프를 사용한다. 간편모드는 선택 버스의 기본 연결과 마이크를 편집하면서 나머지 연결을 보존한다. 모드 전환은 엔진을 중지하거나 그래프를 축약하지 않는다. 구조/장치 변경은 중지 후, 동일 구조의 파라미터·레이아웃 변경은 실행 중 적용한다.
+
+## 오디오 처리
+
 ```text
-ui/                         React + TypeScript 화면, CSS, Lucide 아이콘
-locales/                    C#·React가 공유하는 언어별 메시지 키·번역 리소스
-src/CustomStereoMix.App/     WPF 창, WebView2 호스트, 트레이와 종료 처리
-src/CustomStereoMix.State/   앱 상태, 명령과 설정 저장, JSON UI 브리지
-src/CustomStereoMix.Audio/   NAudio/WASAPI 장치, 세션, 리샘플링, DSP, 저장소
-src/CustomStereoMix.Core/    장치·설정 모델, 인터페이스, 공통 검증
-installer/                  Inno Setup 설치기 소스
-tools/                     공식 SVG 기반 앱 아이콘 및 favicon 생성 도구
-tests/CustomStereoMix.Tests/ 오디오와 상태 동작 회귀 검증
+N개의 WASAPI loopback / capture endpoint
+  → endpoint별 공유 캡처·float 변환·지속 리샘플링·입력 버퍼
+  → GraphMixer: 소스/간선 게인 → N개 버스 합산·보정
+  → 출력별 합산·최종 제한
+  → 독립 출력 버퍼 → N개의 WASAPI 출력
 ```
 
-`Core`와 `State`는 Windows UI와 NAudio에 의존하지 않습니다. `App`은 인터페이스를 통해 상태를 조작하며 장치를 직접 열지 않습니다. NAudio 객체의 수명은 `AudioRouteSession`과 `NaudioRouteController`가 관리합니다.
+- `NaudioDeviceService`는 활성 Render·Capture endpoint와 기본 장치·mix format을 읽는다. 같은 표시 이름이어도 endpoint ID가 다르면 별개다.
+- `GraphAudioSession`은 동일 kind+endpoint 캡처를 공유한다. 한 출력의 WASAPI 요청이 블록 처리를 구동하고 다른 출력은 각자 큐를 소비한다. UI 타이머로 오디오를 구동하지 않는다.
+- `GraphMixer`는 블록을 한 번 계산해 팬아웃하며 출력에 도달하지 않는 노드는 실행하지 않는다. 처리용 배열·버퍼를 미리 만들고 파라미터 계획을 원자적으로 교체한다. 게인 변화는 10ms 프레임 램프로 적용한다.
+- `AdaptiveAudioBuffer`는 프레임 정렬, 큐 용량 제한, 초기 채움과 제한된 시계 차이 보정을 제공한다. 소비자가 버퍼를 공유해 다른 출력의 샘플을 빼앗지 않는다.
+- 믹서 처리 후 출력별 최종 리미터를 적용한다. 시계 보정 보간 뒤에도 활성 출력 리미터로 제한한다.
+- 출력 초기화/실행 오류는 해당 출력에 표시하고 나머지는 유지할 수 있다. 주 출력이 실패하면 정상 출력으로 넘기며 모든 출력이 실패하면 전체 세션을 종료한다.
+- 미터와 진단은 별도 타이머에서 읽는다. PCM은 JSON 브리지를 통과하지 않는다.
 
-React의 명령은 WebView2 JSON 메시지 → `UiBridge` → `MainWindowViewModel` → 서비스 인터페이스 순서로 전달됩니다. 브리지는 허용된 명령과 설정만 처리하고 전체 변경값을 검증한 뒤 적용합니다. 상태 스냅샷의 revision으로 오래된 응답이 최신 화면 상태를 덮어쓰지 않게 합니다. 미터는 별도 메시지로 전달되고 실제 PCM은 C# 안에서만 흐릅니다.
-
-오디오 경로:
+## UI와 상태 흐름
 
 ```text
-재생 장치 WASAPI loopback
- → float32 변환 및 지속적인 WDL 리샘플링
- → 프레임 정렬된 링 버퍼
- → 선택적 마이크 혼합, 볼륨, 압축, 최종 리미터
- → WASAPI 가상 케이블 재생 장치
- → 수신 앱에서 해당 케이블 녹음 장치 선택
+React 명령 → WebView2 JSON → UiBridge → MainWindowViewModel → 서비스
+서비스 상태/미터 → 상태 스냅샷·미터 메시지 → React
 ```
 
-WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시합니다. 외부 이동·팝업·권한·호스트 객체 접근은 막고, 설치 안내 링크만 호스트가 기본 브라우저로 엽니다. 개발 미리보기의 가짜 오디오 브리지는 프로덕션 번들에서 제거됩니다.
+`UiBridge`는 명령을 직렬화하고 전체 수정값을 검증한다. 상태 revision과 graphRevision으로 오래된 응답·수정을 거부한다. 그래프 편집은 UI에서 짧게 묶어 순차 전송하고 거부되면 서버 상태로 복구한다. 저장되지 않은 수정이 처리되는 동안 시작/모드 전환을 잠그고 실행 중 중지는 가능하게 유지한다.
 
-설치기 빌드는 `build_installer.ps1`을 사용합니다. Node 의존성 복원, React 빌드, .NET self-contained publish와 Inno Setup 컴파일을 수행합니다. 설치 시 WebView2가 없을 때만 공식 런타임 부트스트래퍼를 실행하며 가상 케이블 드라이버는 포함하지 않습니다.
+`ui/src/advanced/GraphWorkspace.tsx`는 노드·간선·장치 목록·상세 패널·출력 팝업·선택 믹서·JSON 입출력을 담당한다. `AudioControls.tsx`의 미터·게인·숫자 입력은 간편모드와 공유한다. 음수·양수 게인 범위를 슬라이더의 양쪽 절반에 나눠 0 dB를 중앙에 둔다. 고급 그래프 모듈은 필요할 때 로드한다.
 
-설정은 장치 ID로 저장하며 기본값 복구와 초기화가 같은 공통 검증을 사용합니다. 시작·중지·초기화 처리 중에는 관련 설정을 잠그고, 종료 시 진행 중인 명령을 기다린 후 오디오를 정리하고 저장합니다.
+브라우저 개발용 `preview.ts`는 샘플 장치와 시뮬레이션 미터를 사용한다. 실제 오디오와 같은 UI 흐름을 검증하기 위한 것이며 프로덕션 번들에서는 제외한다. README 이미지는 이 미리보기의 직접 캡처다.
 
-언어는 `AppSettings.Language`에 저장합니다. `LanguageCatalog`는 공통 JSON 리소스를 발견하고, C#의 `MessageKey`와 React의 키 타입으로 번역 식별자를 검증합니다. 상태·오류·업데이트는 `LocalizedMessage`의 키와 매개변수로 유지하여 언어 변경 시 다시 표시합니다. 설치기는 별도 `initial-language.json`을 만들며 사용자 설정을 덮어쓰지 않습니다. 언어를 바꿔도 WASAPI 세션은 유지합니다. 확장 방법은 [LOCALIZATION.md](LOCALIZATION.md)에 있습니다.
+WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시한다. 외부 이동·팝업·권한·호스트 객체 접근을 제한하고 허용된 설치·릴리즈 링크는 호스트가 기본 브라우저로 연다. 화면 새로고침·트레이 숨김은 네이티브 세션을 종료하지 않는다.
 
+## 저장·언어·배포
 
-## 릴리즈와 업데이트
+설정은 장치 ID, 그래프, 선택 믹스, UI 모드와 모드별 창 크기를 포함한다. 정상 백업·손상 복구·원자적 저장을 사용한다. 종료는 진행 중인 시작·초기화 명령을 기다린 후 세션을 정리하고 저장한다.
 
-`.github/workflows/release.yml`은 vX.Y.Z 태그에서 설치기를 빌드하고 GitHub Releases에 게시합니다. `ReleaseVersion`이 태그의 숫자 형식을 정의하고 `GitHubReleaseUpdateService`가 공개 정식 릴리즈와 설치기 링크를 검증합니다. WPF 호스트는 첫 화면 준비 후 백그라운드 확인을 시작하며 `UiBridge`는 업데이트 상태·팝업과 허용된 릴리즈 링크 명령을 React에 연결합니다. 자세한 배포 절차는 [RELEASING.md](RELEASING.md)를 참고하세요.
+언어는 `AppSettings.Language`에 저장한다. C#의 `MessageKey`와 React 타입은 같은 JSON 리소스를 사용한다. 설치기는 `initial-language.json`만 만들며 사용자 설정을 덮어쓰지 않는다. 언어 변경은 실행을 유지한다. 자세한 규칙은 [LOCALIZATION.md](LOCALIZATION.md)에 있다.
 
-업데이트 설치기는 앱 내부에서 내려받아 SHA-256 검증 후 부모 앱 종료를 기다리는 별도 실행 모드로 넘깁니다. 자동 실행은 `WindowsStartupService`가 현재 사용자 레지스트리로 관리합니다. 설정과 사용법은 React의 모달 패널로 표시하며 오디오 연결은 유지합니다.
+`build_installer.ps1`은 React 빌드·self-contained publish·Inno Setup 컴파일을 수행한다. 가상 드라이버는 포함하지 않는다. 태그 워크플로는 검사 후 설치기·SHA-256 파일을 GitHub Releases에 게시한다. 앱은 공개 정식 릴리즈를 확인하고 설치기를 검증한 뒤 사용자 확인에 따라 종료·설치한다. [RELEASING.md](RELEASING.md)를 참고한다.
+
+실제 장치 검사와 남은 안정화 범위는 [VALIDATION.md](VALIDATION.md)에 기록한다.

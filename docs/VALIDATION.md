@@ -1,0 +1,72 @@
+# 2.0 구현과 장치 검증 기록
+
+2026-10-12 기준. 소스 버전은 2.0.0이며 설치기 배포나 릴리스 게시를 수행한 기록은 아니다.
+
+## 다시 실행하는 검사
+
+프로젝트 루트 PowerShell에서 실행한다. 기본 회귀 검사는 실제 장치를 열지 않는다. 선택 실행하는 세션 검사는 활성 캡처 장치를 열고 믹스를 음소거한 상태로 5초 실행한다. 해당 종류의 입력 및 두 개 이상의 실제 출력이 필요하며 장치 목록에 따라 대상이 선택된다.
+
+```powershell
+dotnet build CustomStereoMix.slnx -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devices
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --graph-audio-smoke
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --graph-virtual-input-smoke
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --graph-partial-smoke
+```
+
+마지막 명령은 여러 가상·물리 출력을 함께 열어 정상 출력 유지와 실패 격리를 확인한다. 가상 출력들의 드라이버 경합 여부에 따라 오류 수가 달라질 수 있다. 릴리즈 게시 스크립트 변경은 별도로 `tests/ReleasePublishing.Tests.ps1`을 실행한다.
+
+## 구현
+
+- 공통 GraphProject를 간편·고급모드에서 편집한다. 모드 전환은 실행을 유지한다.
+- 재생음(loopback)·물리/가상 입력(capture) → 여러 믹스 → 여러 출력. 장치 이름 대신 Windows endpoint ID로 연결하고 같은 endpoint 캡처는 공유한다.
+- 입력·노드·간선·마스터 게인과 뮤트, 컴프레서, 버스 및 출력 리미터, 미터와 개별 오류 표시.
+- 독립 출력 버퍼, 시계 차이 보정, 10ms 게인 변화, 중복 출력 및 직접/가상 반환 경로 차단.
+- 노드 드래그/포트 연결, 상세 설정에서 연결, 장치 검색, 자동 정렬, 화면 맞춤/확대/축소, 선택 믹서, 실행 취소/재실행, JSON 가져오기/내보내기.
+- 1.x 설정 이관과 영구 `.v1.bak`, 모드별 창 크기 저장, 기존 트레이·다국어·업데이트 흐름 유지.
+
+## 실제 장치 목록
+
+`dotnet run --project tests/CustomStereoMix.Tests -c Release -- --list-audio-devices`
+
+| 역할 | 실제 열거 결과 |
+|---|---|
+| 재생음/출력 | 헤드폰(SteelSeries Arctis Nova 5), 스피커(2- Pebble V3), CABLE In 16ch, CABLE Input, LG ULTRAGEAR 2개, Realtek Digital Output: 총 7개 |
+| 입력 | 헤드셋 마이크(SteelSeries Arctis Nova 5), CABLE Output: 총 2개 |
+
+LG 장치는 표시 이름이 같지만 endpoint ID가 다르므로 별개로 유지한다. 기본 장치와 채널/샘플레이트도 WASAPI에서 읽는다. 연결이 끊긴 저장 장치는 오프라인으로 표시하며 이름이 비슷한 다른 장치로 자동 교체하지 않는다.
+
+이전 물리 마이크 필터를 제거해 가상 녹음 endpoint도 브리지와 입력 목록에 포함했다. 기본 마이크 선택은 Windows 기본 입력을 우선한다. VB-CABLE Input/In 16ch/Output은 같은 케이블 반환 그룹으로 취급하고 CABLE-A/B 등은 분리한다. 알려지지 않은 가상 장치 이름은 드라이버 종류별로 보수적으로 묶는다. 이는 장치 이름 휴리스틱이며 모든 가상 드라이버의 내부 경로를 알아내는 기능은 아니다. 특히 외부 앱·드라이버에서 추가한 반환 경로는 검출 범위 밖이다.
+
+## 통과한 검사
+
+- Release 앱 빌드: 경고·오류 0개. UI TypeScript/Vite 빌드 통과.
+- 회귀 검사 42개. 가상 입력 포함 브리지, 가상 케이블 별칭의 순환 거부/별도 케이블 허용도 포함한다.
+- 물리 마이크 + LG 재생음 캡처 → 2개 믹스 → 헤드폰/스피커, 5초 무음 세션: 오류 0개.
+- CABLE Output + LG 재생음 캡처 → 2개 믹스 → 헤드폰/스피커, 5초 무음 세션: 오류 0개.
+- 가상 출력 2개 + 물리 출력 2개를 동시에 여는 검사: 3개 출력 실행, CABLE Input 한 출력의 `0x8889000A` 실패 격리. 동일 드라이버 별칭을 동시에 열 때의 경합 가능성이 있으나 원인 확정은 하지 않았다. 단독 가상 출력은 열렸다.
+- 브라우저: 포트 드래그, 가상 입력 추가, 같은 케이블 반환 연결 거부, 별도 케이블 허용, 실행 취소/재실행, JSON 입출력, 실행 중 구조 잠금, 모드 전환 유지, 0 dB 중심, 숫자 볼륨, 간편모드 마이크 껐다 켜기, 패널/도크/작은 창 점검.
+
+브라우저 `http://127.0.0.1:5173/?advanced`는 명시적인 배너가 있는 샘플 UI 미리보기다. 실제 Windows 장치와 PCM 처리는 네이티브 앱에서 수행한다. 브라우저의 샘플 미터를 실제 음성 검증으로 계산하지 않는다.
+
+## README 화면
+
+현재 코드에서 1280×720, DPR 1로 다시 캡처했다. 배너·장치 이름·미터를 합성하거나 실제 장치 화면으로 위장하지 않았다.
+
+- [고급모드](images/advanced-mode.png): 3개 소스, 2개 믹스, 3개 출력.
+- [간편모드](images/simple-mode.png): 기본 출력 전달과 마이크 혼합 토글.
+- [믹서](images/mixer.png): 입력별 페이더와 마스터 조작.
+- [설정](images/settings.png), [사용법](images/usage-guide.png): 현재 모달 UI.
+
+README에서 사용하지 않는 1.x 이미지, 디자인 시안, 생성 프롬프트, 중간 비교·작업 계획·일회성 조사 자료는 docs에서 제거했다. 핵심 구현·검증 내용은 이 문서와 프로젝트 구조에 통합했다. 낮은 높이의 창에서는 미니맵을 숨겨 노드·볼륨 조작을 가리지 않도록 했다.
+
+## 남은 안정화 범위
+
+무음 세션 테스트는 장치 열기·처리·종료 경로를 검증한다. 실제 청취와 Discord/OBS 수신 품질, 장시간 실행(8시간), 장치 제거/재연결, 절전 복귀는 아직 검증하지 않았다. 자동 재연결은 구현하지 않았으므로 중지 후 새로고침하고 다시 시작한다. 실행 중 구조/장치 변경은 잠그고 볼륨·뮤트 등 파라미터만 적용한다. 앱별 캡처, EQ 및 믹스 간 연결은 이번 구현 범위에 포함하지 않는다.
+
+## 실행
+
+`dotnet run --project src/CustomStereoMix.App -c Release`
+
+UI만 확인: `cd ui` 후 `npm run dev -- --port 5173 --strictPort`.

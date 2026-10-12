@@ -1,182 +1,123 @@
-<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mix icon" /></p>
+<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mix" /></p>
 <h1 align="center">Custom Stereo Mix</h1>
 <p align="center"><a href="README.md">한국어</a> · English · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a></p>
-<p align="center">Custom stereo mix for Windows — send PC playback and your microphone to Discord, OBS, recording and STT apps</p>
-<p align="center"><a href="#quick-start">Quick start</a> · <a href="#installation">Installation</a> · <a href="#build">Build</a> · <a href="#troubleshooting">Troubleshooting</a></p>
-<p align="center"><img src="docs/images/main-window.png" width="760" alt="Stereo mix desktop interface with source, output target, signal monitor and microphone mix" /></p>
-<p align="center"><sub>The screenshot shows the Korean interface with real Windows devices. Device names depend on your PC.</sub></p>
+<p align="center">Mix Windows playback and capture inputs, then send them to multiple outputs.</p>
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#advanced">Advanced mode</a> · <a href="#installation">Install</a> · <a href="#build">Build</a> · <a href="#troubleshooting">Troubleshooting</a></p>
 
-**Custom Stereo Mix brings stereo mix functionality to Windows.** Even if your sound device has no built-in Stereo Mix input, this desktop app captures playback from your selected headphones or speakers and sends it to another app through a virtual audio cable. You can also mix in a physical microphone to send PC audio and your voice as a single input.
+![Advanced mode: three sources, two mixes and three outputs](docs/images/advanced-mode.png)
+
+*Screenshots show the current 2.0 browser UI preview with sample devices and simulated meters. Actual audio runs in the Windows desktop app.*
+
+Custom Stereo Mix is a Windows app for **mixing playback loopbacks, microphones and virtual capture inputs into multiple output devices**. Simple mode keeps everyday playback routing and microphone controls. Advanced mode lets you connect several mixes with nodes and edges. With a virtual audio cable, Discord, OBS, recording or STT apps can receive a mix as an input.
+
+This README describes the **2.0.0 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
 
 ## Features
 
-- **Custom stereo mix** — capture playback from a selected device for Discord, OBS, recorders and speech-to-text apps.
-- **PC audio + microphone** — optionally include a physical microphone and adjust both gains separately.
-- **Monitor and processing** — live signal visualization, output gain, optional compression and a final limiter.
-- **System tray** — keep routing when the window closes or minimizes; start, stop or exit from the tray.
-- **Saved settings** — device IDs, settings backups, recovery and reset.
-- **Built-in guide** — first-run instructions and a virtual cable setup guide you can reopen anytime.
-- **Four languages** — Korean, English, Japanese and Simplified Chinese, selectable during installation and in Settings.
-
-> **Additional setup required:** install a **virtual audio cable separately** to use stereo mix. VB-CABLE, VAC and other products with paired playback and recording endpoints can work. A virtual audio driver is not included in this installer.
+| Feature | What it does |
+|---|---|
+| Simple mode | Primary playback/output routing, optional microphone, mix selection and volume |
+| Advanced mode | Multiple playback/physical/virtual sources → multiple mixes → multiple outputs |
+| Mixing | Per-send gain and mute, bus master gain, optional mixer dock |
+| Processing | Node compressors, bus/output limiters, meters, clipping and device errors |
+| Graph editing | Device search, drag connections, inspector, auto arrange, zoom and undo/redo |
+| Projects | JSON import/export, automatic persistence and backed-up 1.x migration |
+| App behavior | Tray routing, optional login startup and update checks |
+| Languages | Korean, English, Japanese and Simplified Chinese |
 
 <a id="quick-start"></a>
-## Stereo mix quick start
 
-1. Install a virtual cable from the [official VB-CABLE page](https://vb-audio.com/Cable/). Follow its instructions for administrator installation and restart Windows.
-2. In **Playback source**, select the headphones or speakers actually playing your audio.
-3. Select `CABLE Input` as the **Output target**, then click **Start routing**.
-4. In Discord, OBS, your recorder or STT app, select `CABLE Output` as the **input device**.
+## Start in simple mode
+
+1. To feed another app's input, install a virtual cable such as [VB-CABLE](https://vb-audio.com/Cable/) separately. Ordinary speaker/headphone outputs do not require one.
+2. Choose the device actually playing audio as the **Playback source**.
+3. Choose the **Output target**; for VB-CABLE, use `CABLE Input`.
+4. Enable the microphone option if needed, then choose its device and gain.
+5. Start routing. In the receiving app, select the paired capture endpoint; for VB-CABLE, use `CABLE Output`.
 
 ```text
-Headphone / speaker playback
-  → Custom Stereo Mix [optional microphone mix]
-  → CABLE Input  [playback endpoint]
-  → CABLE Output [recording endpoint]
-  → Discord / OBS / Recorder / STT
+Playback + microphone
+  → Custom Stereo Mix → CABLE Input
+  → CABLE Output → Discord / OBS / recording / STT
 ```
 
-For another virtual cable, send audio to its playback endpoint and select the paired recording endpoint in the receiving app. Routes back to the same device and virtual cable recording inputs used as microphones are blocked to prevent feedback.
+![Simple mode with playback routing and microphone toggle](docs/images/simple-mode.png)
 
-<a id="installation"></a>
-## Installation
+With several mixes, choose the mix to edit. Simple mode preserves additional sends, outputs and other mixes. **Changing modes does not stop audio.**
 
-| Requirement | Details |
-| --- | --- |
-| Windows x64 | Current distribution target. |
-| WebView2 Runtime | Required for the interface. The installer runs Microsoft's official runtime setup if it is missing. |
-| Virtual audio cable | Install separately; the installer does not bundle an audio driver. |
-| .NET Runtime | Included in the release build. Running the app does not require the .NET SDK. |
+<a id="advanced"></a>
 
-Download the installer from [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases), or [build from source](#build). Pushing a `vX.Y.Z` tag creates a release through GitHub Actions.
+## Use advanced mode
 
-- Installer: `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
-- Folder distribution: run `artifacts\webview2\CustomStereoMix.App.exe`
+Enable the header toggle, then:
 
-Installation uses a per-user directory. Internet access is needed if WebView2 must be installed. VB-CABLE driver installation requires administrator privileges separately.
+1. Add playback, capture, mix and output nodes from **Add node** or the device library.
+2. Drag source ports into mix inputs, then mix ports into outputs. The inspector's connection selector is an alternative.
+3. Adjust each send's gain and mute inside the mix. One source can feed several mixes; one mix can feed several outputs.
+4. Open **…** for device and processing controls. Click an edge for send gain, mute or deletion.
+5. Use **Start all / Stop all** for connected mixes.
 
-**Distribute the entire `artifacts\webview2` folder.** The executable needs `wwwroot`, the WebView2 loader and the other DLLs.
+**0 dB is the slider centre.** The left half covers -60..0 dB, the right half 0..+12 dB. Numeric input is available. Double-click or press `0` to reset; arrow keys change 0.1 dB, Shift+arrows 1 dB.
 
-## Interface, language and settings
-
-The light interface opens at 760 × 730. Content scrolls in smaller windows while the start/stop action stays in the footer.
-
-| Setting | Behavior |
-| --- | --- |
-| Guide | Next to Settings. Opens automatically on first launch. **Don't show again** is checked initially and saved when the guide closes. You can always reopen it manually. |
-| Use system tray | Enabled by default. Close and minimize hide the window while routing continues. **Exit** in the tray always exits. With the tray disabled, closing exits too. |
-| Reset settings | After confirmation, stops routing and restores defaults. Cancel keeps the current settings. |
-| Check for updates | At the top of Settings. Checks the latest stable GitHub release and offers its installer and release notes. |
-| Display language | Under Settings → App behavior. Changes the interface, tray and instructions immediately without restarting audio. |
-
-Choose a language when the installer starts. Language priority is **saved preference → installer language → Windows display language → English**. Reinstalling preserves a language you already selected in the app. Reset restores the installation default; folder distributions use the Windows language when supported.
+Gain, mute and processing can change while running. **Stop before changing devices, nodes or connection structure.** Duplicate output endpoints and detected playback/virtual-cable return paths are rejected.
 
 <details>
-<summary>Settings screenshot</summary>
+<summary>Selected-mix dock</summary>
 
-![Settings: updates, tray and audio processing](docs/images/settings.png)
+![Mixer dock with individual send faders and master controls](docs/images/mixer.png)
 
-Scroll down for audio engine settings and reset. Screenshots show the Korean interface.
+The mixer toolbar button opens send faders, meters, mutes and master controls for the selected bus. These edit the same parameters as the graph.
+
 </details>
 
+Import/export project JSON from the toolbar. Devices are bound by Windows endpoint ID, so a project imported on another PC may need device reassignment.
+
+<a id="installation"></a>
+
+## Install and run
+
+Find published installers in [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases). Changing the source version alone does not publish a release.
+
+- Windows x64 and WebView2 Runtime are required.
+- The installer installs the official Microsoft WebView2 Runtime if missing.
+- Folder distributions run `artifacts\webview2\CustomStereoMix.App.exe`. Keep the **whole folder**, including `wwwroot` and DLLs.
+- Virtual drivers are separate products and are not bundled.
+- Self-contained distributions include .NET; building from source requires its SDK.
+
+Closing or minimizing hides the app to the tray by default and preserves routing. Use **tray → Exit** to quit. Tray and login startup options are in settings; automatic startup opens the app without starting audio.
+
 <details>
-<summary>Guide screenshot</summary>
+<summary>Settings and guide</summary>
 
-![Guide: virtual cable installation and endpoint selection](docs/images/usage-guide.png)
+![Update, startup, language and tray settings](docs/images/settings.png)
 
-The Install page button opens the official website. The instructions themselves are available offline.
+![Virtual cable setup guide](docs/images/usage-guide.png)
+
+Scroll settings for processing, engine parameters and reset. Language changes apply immediately without restarting audio.
+
 </details>
 
 <a id="build"></a>
+
 ## Build from source
 
-Run all commands in **PowerShell at the repository root**, where this README is located.
-
-| Tool | Required for |
-| --- | --- |
-| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | C# builds. `global.json` selects 10.0.301 or a compatible newer .NET 10 SDK. |
-| [Node.js / npm](https://nodejs.org/en/download/) | React UI and icons. Node.js 24 is recommended. |
-| [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) | Running the desktop app during development. |
-| [Inno Setup 7](https://jrsoftware.org/isdl.php) | Building the multilingual Windows installer. |
-
-The first build restores NuGet and npm dependencies and needs internet access. Deleted caches and dependencies are recreated as needed.
-
-### Build and run
+Run from the repository root in PowerShell. Install .NET 10 SDK (`global.json`: 10.0.301), Node.js 24/npm and WebView2 Runtime.
 
 ```powershell
 dotnet build CustomStereoMix.slnx -c Release
-dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Release
+dotnet run --project src\CustomStereoMix.App -c Release
 ```
 
-The app project invokes npm restoration and the React production build automatically.
+The C# build restores npm dependencies and builds the React frontend.
 
-### Publish with the helper script
+| Task | Command | Output |
+|---|---|---|
+| Folder distribution | `.\build_exe.ps1` | `artifacts\webview2\` |
+| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.0-Setup-x64.exe` |
 
-```powershell
-.\build_exe.ps1
-```
+Installer builds require Inno Setup 7. Pass `-IsccPath 'C:\path\ISCC.exe'` for a custom location. The default version lives in `Directory.Build.props`. Use `-RegenerateIcons` only when changing app-icon sources. See [release documentation](docs/RELEASING.md) for tagged releases and updates.
 
-Builds use committed icons. Use `-RegenerateIcons` or `tools/build_icons.ps1` after changing icon sources.
-
-This convenience script checks npm dependencies, builds React, then runs `dotnet publish`. It is not a separate mandatory build system. The result is a self-contained Windows x64 distribution in `artifacts\webview2\`; keep the full folder.
-
-### Publish directly
-
-```powershell
-dotnet publish src\CustomStereoMix.App\CustomStereoMix.App.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained true `
-  -o artifacts\webview2
-```
-
-React builds automatically. This command uses the committed icons. If their source or generation code changed, regenerate them first:
-
-```powershell
-.\tools\build_icons.ps1
-```
-
-### Build the installer
-
-With Inno Setup on PATH or in a supported default location:
-
-```powershell
-.\build_installer.ps1
-```
-
-For a custom compiler location:
-
-```powershell
-.\build_installer.ps1 -IsccPath 'C:\Program Files\Inno Setup 7\ISCC.exe'
-```
-
-The script publishes the app, downloads the official WebView2 bootstrapper, checks its Microsoft signature and builds the installer. Inno Setup 7 supplies all four installer translations.
-
-| Output | Default path |
-| --- | --- |
-| App and required files | `artifacts\webview2\` |
-| Installer | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
-
-The default version comes from `Directory.Build.props`. The installer's `-Version` argument overrides it for the app and installer.
-
-### Automatic releases from tags
-
-The [GitHub Actions workflow](.github/workflows/release.yml) checks out the tagged commit and builds it on Windows. After committing and pushing the changes:
-
-```powershell
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
-```
-
-The tag version is applied to the app and installer filename. After tests pass, the workflow builds with Inno Setup, uploads the installer and SHA-256 checksum to a draft, then publishes the release. Incomplete drafts are not offered by the app. An already published release is not overwritten.
-
-The workflow uses GitHub's `GITHUB_TOKEN`; no personal token is needed. See the [release guide](docs/RELEASING.md) for retry details (Korean).
-
-### Visual Studio
-
-Open `CustomStereoMix.slnx` in a version supporting .NET 10 and build Release. Both `dotnet` and `npm` must be available. For folder publishing, choose Release / win-x64 / self-contained. Run `build_installer.ps1` separately to package the installer.
-
-### React development
+### Browser UI preview
 
 ```powershell
 cd ui
@@ -184,70 +125,41 @@ npm ci
 npm run dev
 ```
 
-Browser preview uses fake devices and signals and displays a preview banner. Actual audio routing runs in the desktop app. The preview bridge is excluded from the production bundle.
+Open `http://127.0.0.1:5173/?advanced`. **The browser uses sample devices and meters, without real audio.** Its preview bridge is excluded from production bundles.
 
 ### Tests
 
 ```powershell
-dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devices
 ```
 
-Tests cover resampling continuity and filtering, surround downmixing, buffers, feedback prevention, settings recovery, bridge validation, startup/reset/shutdown races, update checks and language persistence. Also verify actual devices and receiving apps on the target PC.
+Tests cover graph validation, feedback, mixing, output buffers, migration, persistence, bridge, localization and updates. Native muted-session commands and uncompleted listening/long-run checks are in [validation notes](docs/VALIDATION.md).
 
 <a id="troubleshooting"></a>
+
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| Signal is visible but Discord/STT is silent | Select the cable's paired **recording** device in the receiving app: `CABLE Output` for VB-CABLE. The monitor cannot verify the receiving app's settings. |
-| Signal stays at 0% | Select the device actually playing audio. The saved device ID does not automatically follow Windows default-device changes. |
-| Device is missing | Install the cable, restart and Refresh. Known virtual recording cables are excluded from the microphone list to prevent feedback. |
-| Audio breaks up | Stop routing and check latency/buffer settings. Buffer duration must be at least latency. Defaults: 48 kHz, stereo, 50 ms latency, 250 ms buffer. |
-| Closing leaves the app running | Default tray behavior. Right-click tray → Exit, or disable the tray in Settings. |
-| Interface will not open | Keep the complete distribution including `wwwroot` and DLLs, and install WebView2 Runtime. Retry can recover an interface process failure. |
-| Build reports locked files | Exit apps running from that output folder. Stop development servers if npm restoration reports native file locks. |
+| Symptom | Check |
+|---|---|
+| Receiving app is silent | Select the cable's capture endpoint, such as `CABLE Output`. |
+| Playback meter stays silent | Select the endpoint actually playing audio. Saved selections do not follow Windows default changes automatically. |
+| Missing/offline device | Stop and refresh. Similar names are not substituted automatically. Physical and virtual capture endpoints are listed. |
+| Return-path error | Avoid feeding an endpoint or cable back into itself; also inspect routing in external apps. |
+| One output fails | Inspect its node error and device usage. Other working outputs can continue. |
+| Dropouts/latency | Stop and tune latency/buffer. Defaults: 48 kHz, stereo, 50 ms latency, 250 ms buffer. |
+| UI/build fails | Check WebView2 and the complete deployment folder. Close the app before rebuilding locked files. |
 
-## Updates
+Automatic device reconnection, per-app capture, EQ, bus-to-bus chains and live topology edits are not included.
 
-Once the interface is ready, the app checks GitHub Releases in the background once per launch. It shows a popup only for a higher stable `vX.Y.Z` version with a ready Windows x64 installer. **Later** dismisses it; **Check for updates** in Settings can check again.
+## Settings, diagnostics and contribution
 
-**Download installer** downloads inside the app with progress and SHA-256 verification. After you confirm, the app stops audio routing, saves settings, exits, and launches the installer. You can relaunch on completion. A manually launched installer also offers to close a running app, including one in the tray. **Release notes** opens the release page.
+Settings: `%APPDATA%\CustomStereoMix\settings.json`; last valid backup: `.bak`; first 1.x migration backup: `.v1.bak`. `audio-diagnostics.log` in the same directory records device/format/buffer details, not audio. The WebView2 profile is under `%LOCALAPPDATA%\CustomStereoMix\WebView2`.
 
-Start menu shortcuts and Windows sign-in startup are separate installer options. Startup can also be changed in Settings and is preserved during upgrades. Uninstall removes this app's Run and StartupApproved entries. Startup opens the app; audio routing starts manually. Guide and Settings open as popup panels with Esc/Close to return.
+For issues, include app/Windows versions, device names, steps and node errors. Review device IDs before sharing logs.
 
-## Settings and diagnostics
+[Architecture](docs/PROJECT_STRUCTURE.md) · [Localization](docs/LOCALIZATION.md) · [Validation](docs/VALIDATION.md) · [Releasing](docs/RELEASING.md)
 
-| Data | Location |
-| --- | --- |
-| Settings | `%APPDATA%\CustomStereoMix\settings.json` |
-| Previous valid settings | `%APPDATA%\CustomStereoMix\settings.json.bak` |
-| Audio diagnostics | `%APPDATA%\CustomStereoMix\audio-diagnostics.log` |
-| WebView2 profile | `%LOCALAPPDATA%\CustomStereoMix\WebView2` |
+React/TypeScript/React Flow provide the UI; WPF/WebView2 host it; NAudio/WASAPI process PCM in C#. Only commands, state and meters cross the UI bridge.
 
-Settings save after a short delay and on stop/exit. Diagnostics contain device IDs, formats and buffer state, not captured audio, and rotate at about 1 MB. An underrun during silent playback may mean there are no WASAPI packets; consider its timing alongside the signal.
-
-## Technology and localization
-
-| Component | Role |
-| --- | --- |
-| C# / .NET 10 / NAudio | WASAPI capture/output, conversion, resampling, mixing and DSP. |
-| React / TypeScript / Vite | Interface and commands. |
-| WPF / WebView2 | Desktop window, local UI, tray and shutdown. |
-| Lucide | Button icons, app icon and favicon. |
-| Inno Setup | Per-user Windows x64 installer. |
-
-C# handles PCM audio; the UI bridge carries only commands, state and meters. Refreshing or hiding the interface preserves audio routing. See [project structure](docs/PROJECT_STRUCTURE.md) and [localization](docs/LOCALIZATION.md).
-
-Translations use stable message keys and parameters shared by C# and React. Adding a resource registers another app language; installer language entries are added separately. Windows-provided device names are preserved.
-
-## Issues and contributions
-
-Include your Windows and app versions, source/target/receiving device names, reproduction steps and symptoms. Review device IDs before sharing diagnostic logs. Verify relevant tests and, for UI changes, small windows, tray, settings and guide behavior.
-
-`.gitignore` excludes dependencies, build outputs, installers, local settings/logs/recordings and secrets. Source, lockfiles, documentation screenshots and third-party licenses belong in the repository. Check `git status --short` before upload.
-
-## Third-party notices
-
-Notices are included in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [licenses](licenses/). Lucide's ISC and Feather-derived MIT notices are in [LUCIDE-LICENSE.txt](ui/public/LUCIDE-LICENSE.txt).
-
-Virtual audio drivers are separate products governed by their own installation, use and redistribution terms. See [VB-Audio's licensing information](https://vb-audio.com/Services/licensing.htm) for VB-CABLE donationware and bundling conditions.
+Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [licenses](licenses/). UI icons use Material Symbols; existing app icons/favicon use Lucide. Virtual drivers follow their vendors' installation, usage and distribution terms.

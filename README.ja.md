@@ -1,178 +1,120 @@
-<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mixアイコン" /></p>
+<p align="center"><img src="ui/public/app-icon.png" width="64" height="64" alt="Custom Stereo Mix" /></p>
 <h1 align="center">Custom Stereo Mix</h1>
 <p align="center"><a href="README.md">한국어</a> · <a href="README.en.md">English</a> · 日本語 · <a href="README.zh-CN.md">简体中文</a></p>
-<p align="center">Windows用カスタムステレオミキサー — PCの再生音とマイクをDiscord・OBS・録音・STTアプリの入力へ</p>
-<p align="center"><a href="#quick-start">クイックスタート</a> · <a href="#installation">インストール</a> · <a href="#build">ビルド</a> · <a href="#troubleshooting">問題の解決</a></p>
-<p align="center"><img src="docs/images/main-window.png" width="760" alt="再生デバイス、送信先、信号モニター、音量、マイクミックスを表示する画面" /></p>
-<p align="center"><sub>画像は韓国語表示のデスクトップアプリです。Windowsのデバイス名はPCによって異なります。</sub></p>
+<p align="center">Windowsの再生音と入力を複数のミックスにまとめ、必要な出力へ送信。</p>
+<p align="center"><a href="#quick-start">使い始める</a> · <a href="#advanced">詳細モード</a> · <a href="#installation">インストール</a> · <a href="#build">ビルド</a> · <a href="#troubleshooting">問題の解決</a></p>
 
-**Custom Stereo Mixは、Windowsでステレオミキサー機能を実現するデスクトップアプリです。** サウンドデバイスに標準のステレオミキサーがなくても、選択したヘッドホン・スピーカーの再生音を仮想オーディオケーブル経由で別のアプリへ送れます。実際のマイクを混ぜて、PCの音と声を1つの入力にまとめることもできます。
+![複数の入力・ミックス・出力を接続する詳細モード](docs/images/advanced-mode.png)
+
+*画像は2.0のブラウザープレビューです。デバイスとメーターはサンプルであり、実際の音声処理はWindowsデスクトップアプリが行います。*
+
+Custom Stereo Mixは、**PCの再生音・マイク・仮想入力を混合し、複数の出力デバイスへ送るWindowsアプリ**です。簡易モードでは再生元と送信先を選択し、詳細モードではノードと接続線で複数のミックスを構成します。仮想ケーブルを使えばDiscord・OBS・録音・STTアプリの入力へ送信できます。
+
+このREADMEは**2.0.0のソース**を対象としています。実施した検証と未完了の安定性試験は[検証記録](docs/VALIDATION.md)に記載しています。
 
 ## 主な機能
 
-- **カスタムステレオミキサー** — 選択したデバイスの再生音をDiscord・OBS・録音・音声認識アプリへ送信。
-- **PC音声とマイクのミックス** — 実際のマイクを任意で追加し、それぞれの音量を調整。
-- **モニターと音声補正** — リアルタイム信号表示、出力音量、任意のコンプレッサー、最終段のリミッター。
-- **トレイ動作** — ウィンドウを閉じる・最小化しても接続を維持。トレイから開始・停止・終了。
-- **設定の自動保存** — デバイスID、正常な設定のバックアップ、破損時の復元と初期化。
-- **内蔵ガイド** — 初回起動時の案内と、いつでも開ける仮想ケーブル設定ガイド。
-- **4言語対応** — 韓国語、英語、日本語、中国語簡体字。インストール時と設定から選択可能。
-
-> **使用前の追加設定:** ステレオミキサーを使うには、出力を入力へつなぐ**仮想オーディオケーブルを別途インストール**してください。VB-CABLE、VACなど、対応する再生・録音デバイスのペアを持つ製品が使えます。ドライバーは本アプリのインストーラーに同梱していません。
+| 機能 | 内容 |
+|---|---|
+| 簡易モード | 基本の再生元・出力、マイク混合、ミックス選択と音量 |
+| 詳細モード | 複数の再生音・物理/仮想入力 → 複数のミックス → 複数の出力 |
+| ミックス | 入力別の送信音量・ミュート、マスター音量、ミキサードック |
+| 音声補正 | コンプレッサー、バス・出力リミッター、信号・クリッピング・エラー表示 |
+| 編集 | デバイス検索、ポート接続、詳細パネル、整列、ズーム、取り消し・やり直し |
+| プロジェクト | JSON入出力、自動保存、1.x設定の移行とバックアップ |
+| アプリ動作 | トレイ、ログイン時の自動起動、更新確認 |
+| 言語 | 韓国語・英語・日本語・簡体字中国語 |
 
 <a id="quick-start"></a>
-## ステレオミキサーのクイックスタート
 
-1. [VB-CABLE公式ページ](https://vb-audio.com/Cable/)から仮想ケーブルをインストールします。公式の案内に従い、管理者権限でインストールしてPCを再起動します。
-2. 本アプリの**再生音**で、実際に音が出ているヘッドホン・スピーカーを選びます。
-3. **送信先デバイス**に `CABLE Input` を選び、**音声接続を開始**を押します。
-4. Discord・OBS・録音・STTなどの受信アプリで、**入力デバイス**に `CABLE Output` を選びます。
+## 簡易モードで使い始める
+
+1. 別のアプリの入力へ送る場合は[VB-CABLE](https://vb-audio.com/Cable/)などを別途インストールします。通常のスピーカー・ヘッドホンへの出力には不要です。
+2. 実際に音が出ている再生デバイスを選択します。
+3. 送信先を選択します。VB-CABLEでは `CABLE Input` です。
+4. 必要に応じてマイク混合を有効にし、入力デバイスと音量を設定します。
+5. 接続を開始します。受信アプリの入力は対応する録音側デバイスにします。VB-CABLEでは `CABLE Output` です。
 
 ```text
-ヘッドホン・スピーカーの再生音
-  → Custom Stereo Mix [任意のマイクミックス]
-  → CABLE Input  [再生デバイス]
-  → CABLE Output [録音デバイス]
-  → Discord / OBS / 録音 / STT
+PC再生音 + マイク → Custom Stereo Mix → CABLE Input
+  → CABLE Output → Discord / OBS / 録音 / STT
 ```
 
-ほかの仮想ケーブルでも、その製品の再生デバイスへ送信し、受信アプリで対になる録音デバイスを選びます。同じデバイスに戻す接続や、仮想ケーブルの録音入力をマイクとして再ミックスする接続は、フィードバック防止のため拒否します。
+![基本の接続とマイク混合スイッチを備える簡易モード](docs/images/simple-mode.png)
 
-<a id="installation"></a>
-## インストール
+複数のミックスがある場合は操作するミックスを選択します。簡易モードで基本接続を変更しても、追加の入力・出力や他のミックスは保持されます。**モード切り替えで音声は停止しません。**
 
-| 必要なもの | 内容 |
-| --- | --- |
-| Windows x64 | 現在の配布対象。 |
-| WebView2 Runtime | 画面の表示に必要。未導入ならインストーラーがMicrosoft公式のランタイムをインストールします。 |
-| 仮想オーディオケーブル | 別途インストールが必要。ドライバーは同梱していません。 |
-| .NET Runtime | 配布ビルドに含まれます。実行時に.NET SDKは不要です。 |
+<a id="advanced"></a>
 
-インストーラーは[GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)から入手できます。`vX.Y.Z` タグのプッシュで自動リリースされます。[ソースからビルド](#build)することも可能です。
+## 詳細モード
 
-- インストーラー: `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
-- フォルダー配布: `artifacts\webview2\CustomStereoMix.App.exe` を実行
+上部の切り替えを有効にします。
 
-ユーザー別のフォルダーにインストールします。WebView2の追加インストールにはインターネット接続が必要です。VB-CABLEドライバーの導入には別途管理者権限が必要です。
+1. ノード追加またはデバイス一覧から再生音・入力・ミックス・出力を追加します。
+2. ソースの右ポートをミックスの左ポートへ、ミックスを出力へドラッグします。詳細パネルの接続先選択でも接続できます。
+3. ミックス内で送信音量とミュートを調整します。1つの入力を複数のミックスへ、1つのミックスを複数の出力へ送れます。
+4. **…**でデバイスや音声補正を設定します。接続線をクリックすると、その送信音量・ミュート・削除を操作できます。
+5. 全体の開始・停止ボタンで接続されたミックスを実行します。
 
-**フォルダー配布では `artifacts\webview2` 全体を渡してください。** 実行ファイルに加え、`wwwroot`、WebView2ローダー、各DLLが必要です。
+**音量スライダーの中央は0 dB**です。左半分は-60..0 dB、右半分は0..+12 dB。数値入力、ダブルクリックまたは `0` キーでのリセットに対応します。矢印キーは0.1 dB、Shift+矢印は1 dBです。
 
-## 画面・言語・設定
-
-明るい画面の初期サイズは760 × 730です。小さいウィンドウでは内容をスクロールでき、開始・停止ボタンは下部に残ります。
-
-| 機能 | 動作 |
-| --- | --- |
-| 使い方 | 設定ボタンの左側から開けます。初回は自動表示され、初期状態でチェックされた**次回から表示しない**を閉じる時に保存します。手動でいつでも再表示できます。 |
-| システムトレイを使用 | 初期状態で有効。閉じる・最小化でトレイに隠し、接続を維持します。トレイの**終了**は完全に終了します。無効にすると閉じるボタンでも終了します。 |
-| 設定を初期化 | 確認後に接続を停止し、初期値に戻します。キャンセル時は変更しません。 |
-| 更新を確認 | 設定の最上部。GitHubの最新正式リリースを確認し、新しいインストーラーと変更内容を案内します。 |
-| 表示言語 | 設定 → アプリの動作。画面・トレイ・案内に即時反映し、音声接続を維持します。 |
-
-インストーラー起動時に言語を選べます。優先順位は**保存した言語 → インストール時の言語 → Windowsの表示言語 → 英語**です。アプリで選択した言語は再インストール後も維持します。初期化するとインストール時の言語に戻り、フォルダー配布では対応するWindowsの言語が初期値になります。
+実行中も音量・ミュート・補正を操作できます。**デバイス・ノード・接続構造は停止後に変更**します。出力デバイスの重複と、同じ再生デバイス・仮想ケーブルへ戻る経路を検出して拒否します。
 
 <details>
-<summary>設定画面を見る</summary>
+<summary>選択したミックスのドック</summary>
 
-![更新、トレイ、音声補正の設定](docs/images/settings.png)
+![入力別フェーダー・メーター・マスター操作](docs/images/mixer.png)
 
-オーディオエンジンと初期化は下へスクロールすると表示されます。画像は韓国語表示です。
+ツールバーのミキサーボタンから開きます。グラフ内の操作と同じパラメーターを変更します。
+
 </details>
 
+プロジェクトJSONはツールバーから入出力できます。デバイスはWindowsのendpoint IDで保存するため、別のPCでは再指定が必要な場合があります。
+
+<a id="installation"></a>
+
+## インストールと実行
+
+公開されたインストーラーは[GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)で確認してください。ソースのバージョン変更だけではリリースは公開されません。
+
+- Windows x64とWebView2 Runtimeが必要です。未導入の場合、インストーラーがMicrosoft公式ランタイムを導入します。
+- フォルダー配布では `artifacts\webview2\CustomStereoMix.App.exe` を実行します。`wwwroot`とDLLを含む**フォルダー全体**が必要です。
+- 仮想ドライバーは同梱しません。self-contained配布には.NETランタイムを含みます。
+- 閉じる・最小化は既定でトレイに隠し、音声接続を維持します。終了は**トレイ → 終了**です。
+- トレイとログイン時の自動起動は設定で変更できます。自動起動はアプリを開くだけで、音声送信は手動で開始します。
+
 <details>
-<summary>使い方の画面を見る</summary>
+<summary>設定と使用案内</summary>
 
-![仮想ケーブルのインストールと入力・出力の設定ガイド](docs/images/usage-guide.png)
+![更新・自動起動・言語・トレイ設定](docs/images/settings.png)
 
-インストールページのボタンで公式サイトを開けます。案内自体はオフラインでも表示できます。
+![仮想ケーブルの接続案内](docs/images/usage-guide.png)
+
+設定をスクロールすると音声補正・エンジン・初期化があります。言語変更は音声を止めず、画面とトレイに即時反映します。
+
 </details>
 
 <a id="build"></a>
+
 ## ソースからビルド
 
-すべてのコマンドは、**このREADMEがあるリポジトリのルートでPowerShell**から実行します。
-
-| ツール | 用途 |
-| --- | --- |
-| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | C#のビルド。`global.json` は10.0.301または互換性のある新しい.NET 10 SDKを選択します。 |
-| [Node.js / npm](https://nodejs.org/en/download/) | React UIとアイコンのビルド。Node.js 24を推奨します。 |
-| [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) | 開発時にデスクトップアプリを実行。 |
-| [Inno Setup 7](https://jrsoftware.org/isdl.php) | 4言語のWindowsインストーラーを作成。 |
-
-初回はNuGetとnpmの依存関係を復元するため、インターネット接続が必要です。削除されたキャッシュと依存関係は必要に応じて再生成されます。
-
-### ビルドと実行
+.NET 10 SDK（`global.json`: 10.0.301）、Node.js 24/npm、WebView2 Runtimeを用意し、ルートのPowerShellで実行します。
 
 ```powershell
 dotnet build CustomStereoMix.slnx -c Release
-dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Release
+dotnet run --project src\CustomStereoMix.App -c Release
 ```
 
-アプリのプロジェクトからnpm復元とReactの本番ビルドを自動実行します。
+C#ビルドがnpmの復元とReactビルドも実行します。
 
-### スクリプトで配布ビルド
+| 作業 | コマンド | 出力 |
+|---|---|---|
+| フォルダー配布 | `.\build_exe.ps1` | `artifacts\webview2\` |
+| インストーラー | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.0-Setup-x64.exe` |
 
-```powershell
-.\build_exe.ps1
-```
+インストーラーにはInno Setup 7が必要です。別の場所にある場合は `-IsccPath 'C:\path\ISCC.exe'` を指定します。バージョンは `Directory.Build.props` で管理します。アプリアイコンの原本を変更した場合だけ `-RegenerateIcons` を使います。自動配布は[リリース案内](docs/RELEASING.md)を参照してください。
 
-コミット済みのアイコンを使用します。元のアイコンを変更した場合は `-RegenerateIcons` または `tools/build_icons.ps1` で再生成してください。
-
-npm依存関係の確認、Reactのビルド、`dotnet publish` をまとめた便利なスクリプトです。必須の独自ビルドシステムではありません。結果は.NETを含むWindows x64版として `artifacts\webview2\` に出力されます。
-
-### 直接配布ビルド
-
-```powershell
-dotnet publish src\CustomStereoMix.App\CustomStereoMix.App.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained true `
-  -o artifacts\webview2
-```
-
-Reactは自動ビルドされ、保存済みのアイコンを使用します。アイコンの元データや生成処理を変更した場合は、先に再生成します。
-
-```powershell
-.\tools\build_icons.ps1
-```
-
-### インストーラーを作成
-
-Inno Setupが標準の場所またはPATHにある場合:
-
-```powershell
-.\build_installer.ps1
-```
-
-別の場所にある場合:
-
-```powershell
-.\build_installer.ps1 -IsccPath 'C:\Program Files\Inno Setup 7\ISCC.exe'
-```
-
-アプリの配布ビルド後、Microsoft署名を確認した公式WebView2ブートストラッパーを同梱し、インストーラーを作成します。Inno Setup 7は4言語のインストーラー翻訳を提供します。
-
-| 出力 | 初期パス |
-| --- | --- |
-| アプリと必要なファイル | `artifacts\webview2\` |
-| インストーラー | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
-
-初期バージョンは `Directory.Build.props` で管理します。`-Version` を指定するとアプリとインストーラーのバージョンを上書きできます。
-
-### タグによる自動リリース
-
-[GitHub Actions](.github/workflows/release.yml)はタグの指すコミットをWindowsでビルドします。変更をコミット・プッシュした後:
-
-```powershell
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
-```
-
-タグのバージョンをアプリとファイル名に反映します。テスト成功後、Inno Setupで作成したインストーラーとSHA-256ファイルを下書きへアップロードしてから公開します。未完成の下書きは更新通知に表示せず、公開済みの同じリリースは上書きしません。GitHubの `GITHUB_TOKEN` を使用するため、個人トークンは不要です。詳しくは[リリースガイド](docs/RELEASING.md)を参照してください（韓国語）。
-
-### Visual Studioと画面開発
-
-.NET 10対応のVisual Studioで `CustomStereoMix.slnx` を開き、Releaseでビルドできます。`dotnet` と `npm` が実行できる環境が必要です。フォルダー公開はRelease / win-x64 / self-containedを選び、インストーラーは別途スクリプトで作成します。
+### UIプレビューとテスト
 
 ```powershell
 cd ui
@@ -180,70 +122,41 @@ npm ci
 npm run dev
 ```
 
-ブラウザープレビューは模擬デバイスと信号を使用し、プレビュー表示が付きます。実際の音声接続はデスクトップアプリで動作します。プレビューブリッジは本番バンドルに含まれません。
+`http://127.0.0.1:5173/?advanced` で確認できます。**ブラウザーはサンプルデバイスとメーターを使い、実音声には接続しません。**このブリッジは製品ビルドから除外されます。
 
-### テスト
+ルートへ戻って検証します。
 
 ```powershell
-dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release
+dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devices
 ```
 
-リサンプリングの連続性・フィルター、サラウンドのダウンミックス、バッファー、フィードバック防止、設定の保存・復元、ブリッジ検証、開始・初期化・終了の競合、更新、言語保存を確認します。実際のデバイスと受信アプリも対象PCで確認してください。
+グラフ・帰還防止・ミックス・出力バッファー・設定移行/保存・ブリッジ・翻訳・更新を検証します。実デバイスの無音セッションと未実施の試聴・長時間試験は[検証記録](docs/VALIDATION.md)に区別しています。
 
 <a id="troubleshooting"></a>
+
 ## 問題の解決
 
-| 症状 | 確認すること |
-| --- | --- |
-| 信号はあるのにDiscord・STTでは無音 | 受信アプリで対になる**録音デバイス**を選びます。VB-CABLEなら `CABLE Output`。モニターでは受信アプリの設定までは確認できません。 |
-| 信号が0%のまま | 実際に再生しているデバイスを選びます。保存したデバイスIDはWindowsの既定デバイス変更に自動追従しません。 |
-| デバイスがない | 仮想ケーブルの導入・再起動後に更新します。既知の仮想ケーブル録音入力は、フィードバック防止のためマイク一覧から除外します。 |
-| 音が途切れる | 接続を止めて遅延・バッファーを確認します。バッファーは遅延以上が必要です。初期値は48 kHz、ステレオ、遅延50 ms、バッファー250 ms。 |
-| 閉じても動作し続ける | 初期設定のトレイ動作です。トレイを右クリック → 終了、または設定でトレイを無効にします。 |
-| 画面が開かない | `wwwroot` とDLLを含むフォルダー全体、WebView2 Runtimeを確認します。画面プロセスの障害は再試行で復元できます。 |
-| ビルド時にファイルが使用中 | 出力先で実行中のアプリを終了します。npmのネイティブファイルがロックされている場合は開発サーバーも停止します。 |
+| 症状 | 確認事項 |
+|---|---|
+| 受信アプリが無音 | ケーブルの録音側（例: `CABLE Output`）を入力に選択 |
+| 再生音メーターが動かない | 実際に再生中のデバイスを選択。Windows既定の変更には自動追従しません |
+| デバイスがない・オフライン | 停止後に更新。似た名前の別デバイスへ自動変更しません。物理/仮想入力の両方を表示します |
+| 帰還経路エラー | 同じデバイス・ケーブルへ戻る経路と外部アプリのルーティングを確認 |
+| 一部の出力が失敗 | ノードのエラーとデバイス使用状態を確認。他の出力は継続可能です |
+| 音切れ・遅延 | 停止後に遅延/バッファーを調整。既定は48 kHz、ステレオ、50 ms / 250 ms |
+| 画面・ビルドが失敗 | WebView2と配布フォルダー全体を確認。再ビルド時は実行中アプリを終了 |
 
-## 更新
+自動再接続、アプリ別キャプチャ、EQ、ミックス間の接続、実行中の構造変更は未対応です。
 
-画面の準備後、起動ごとに1回バックグラウンドでGitHub Releasesを確認します。より新しい正式版 `vX.Y.Z` と利用可能なWindows x64インストーラーがある場合のみ通知します。**後で**で閉じても、設定の**更新を確認**から再確認できます。
+## 設定・診断・貢献
 
-**インストーラーを入手**でアプリ内ダウンロードとSHA-256検証を行います。完了後に確認すると音声転送を停止して設定を保存し、アプリを終了してインストーラーを自動起動します。インストール完了時に再起動できます。手動で起動したインストーラーも、トレイ内の実行中アプリを閉じるよう案内します。**変更内容を見る**はリリースページを開きます。
+設定は `%APPDATA%\CustomStereoMix\settings.json`、正常設定のバックアップは `.bak`、初回1.x移行のバックアップは `.v1.bak` です。同じフォルダーの `audio-diagnostics.log` はデバイス・形式・バッファーを記録し、音声は保存しません。WebView2プロファイルは `%LOCALAPPDATA%\CustomStereoMix\WebView2` です。
 
-スタートメニューのショートカットとWindowsサインイン時の起動は、別々のインストールオプションです。自動起動は設定からも変更でき、更新時に現在の選択を維持します。アンインストール時にこのアプリのRunとStartupApproved項目だけを削除します。音声転送は手動で開始します。使い方と設定はポップアップパネルで開き、Escまたは閉じるで戻れます。
+不具合報告にはアプリ/Windowsのバージョン、デバイス名、再現手順、ノードエラーを添えてください。ログを共有する前にデバイスIDなどを確認してください。
 
-## 設定と診断
+[構造](docs/PROJECT_STRUCTURE.md) · [翻訳](docs/LOCALIZATION.md) · [検証](docs/VALIDATION.md) · [配布](docs/RELEASING.md)
 
-| データ | 保存先 |
-| --- | --- |
-| 設定 | `%APPDATA%\CustomStereoMix\settings.json` |
-| 前回の正常な設定 | `%APPDATA%\CustomStereoMix\settings.json.bak` |
-| オーディオ診断ログ | `%APPDATA%\CustomStereoMix\audio-diagnostics.log` |
-| WebView2プロファイル | `%LOCALAPPDATA%\CustomStereoMix\WebView2` |
+UIはReact・TypeScript・React Flow、ホストはWPF・WebView2、音声はNAudio/WASAPIです。PCMはC#で処理し、ブリッジにはコマンド・状態・メーターのみを渡します。
 
-変更後の短い遅延と停止・終了時に設定を自動保存します。ログにはデバイスID、形式、バッファー状態を記録し、音声は保存しません。約1 MBでログをローテーションします。無音時のunderrunはWASAPIパケットがない状態の場合があるため、信号と発生時刻を併せて確認します。
-
-## 技術構成と翻訳
-
-| 構成 | 役割 |
-| --- | --- |
-| C# / .NET 10 / NAudio | WASAPIキャプチャ・出力、変換、リサンプリング、ミックス、DSP。 |
-| React / TypeScript / Vite | 画面とコマンド。 |
-| WPF / WebView2 | ウィンドウ、ローカルUI、トレイ、終了処理。 |
-| Lucide | ボタン・アプリのアイコン、favicon。 |
-| Inno Setup | ユーザー別Windows x64インストーラー。 |
-
-PCMはC#で処理し、UIブリッジはコマンド・状態・メーターだけを伝えます。画面の更新・トレイへの非表示でも音声接続を維持します。[構造](docs/PROJECT_STRUCTURE.md)と[翻訳の追加方法](docs/LOCALIZATION.md)を参照してください。
-
-翻訳はC#とReactで共通の固定キーと引数を使用します。リソースを追加するとアプリの言語として登録され、インストーラーの言語は別途追加します。Windowsが提供するデバイス名は変更しません。
-
-## 不具合報告と貢献
-
-Windows・アプリのバージョン、再生・送信先・受信デバイス名、再現手順、症状を記載してください。ログを共有する前に公開したくないデバイスIDを確認してください。関連テストと、小さい画面・トレイ・設定・使い方も確認します。
-
-`.gitignore` は依存関係、ビルド出力、インストーラー、ローカル設定・ログ・録音、秘密情報を除外します。ソース、ロックファイル、文書の画像、外部ライセンスは含めます。
-
-## 外部コンポーネント
-
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)と[licenses](licenses/)に告知を同梱します。LucideのISC・Feather由来MITライセンスは[LUCIDE-LICENSE.txt](ui/public/LUCIDE-LICENSE.txt)にあります。
-
-仮想オーディオドライバーは別製品であり、各社の導入・使用・再配布条件に従います。VB-CABLEのdonationwareと同梱条件は[VB-Audio公式ライセンス案内](https://vb-audio.com/Services/licensing.htm)を参照してください。
+外部ライセンスは[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)と[licenses](licenses/)にあります。UIはMaterial Symbols、既存アプリアイコン/faviconはLucideを使用します。仮想ドライバーは各ベンダーの条件に従います。
