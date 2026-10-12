@@ -2,6 +2,23 @@ import { t } from "../i18n";
 import type { AppState, AudioNodeConfig, AudioNodeKind, GraphProject } from "../types";
 export const nodeName = (n: AudioNodeConfig) => n.label || t(n.kind === "bus" ? "MixBus" : n.kind === "capture" ? "InputAudio" : n.kind === "output" ? "OutputAudio" : "PlaybackAudio");
 export const deviceList = (s: AppState, k: AudioNodeKind) => k === "capture" ? s.microphones : k === "bus" ? [] : k === "output" ? s.targets : s.sources;
+export const nodeRole = (n: AudioNodeConfig) => t(n.kind === "bus" ? "MixBus" : n.kind === "capture" ? "InputAudio" : n.kind === "output" ? "OutputAudio" : "PlaybackAudio");
+// Match GraphValidator.ActiveNodeIds: muting keeps a route, disabling excludes it.
+export function activeNodeIds(g: GraphProject): Set<string> {
+  const reachable = new Set(g.nodes.filter(n => n.enabled && (n.kind === "capture" || n.kind === "loopback")).map(n => n.id));
+  for (const kind of ["bus", "output"]) for (const n of g.nodes.filter(n => n.enabled && n.kind === kind))
+    if (g.edges.some(e => e.target === n.id && reachable.has(e.source))) reachable.add(n.id);
+  const active = new Set(g.nodes.filter(n => n.kind === "output" && reachable.has(n.id)).map(n => n.id));
+  let changed = true;
+  while (changed) { changed = false; for (const e of g.edges) if (active.has(e.target) && reachable.has(e.source) && !active.has(e.source)) { active.add(e.source); changed = true; } }
+  return active;
+}
+export function signalNodeIds(g: GraphProject): Set<string> {
+  const active = activeNodeIds(g), signal = new Set<string>();
+  for (const kind of ["loopback", "capture", "bus", "output"]) for (const n of g.nodes.filter(n => n.kind === kind && active.has(n.id) && !n.muted))
+    if (kind === "loopback" || kind === "capture" || g.edges.some(e => e.target === n.id && !e.muted && signal.has(e.source))) signal.add(n.id);
+  return signal;
+}
 // Unity sits at the centre. Each side uses its own dB range.
 export const gainToSlider = (db: number) => db <= 0 ? db / 60 * 100 : db / 12 * 100;
 export const sliderToGain = (value: number) => Math.round((value <= 0 ? value / 100 * 60 : value / 100 * 12) * 10) / 10;

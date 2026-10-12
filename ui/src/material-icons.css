@@ -3,7 +3,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: block;
-  src: url("/fonts/material-symbols-rounded.woff2?v=2.0.0") format("woff2");
+  src: url("/fonts/material-symbols-rounded.woff2?v=2.0.1-controls") format("woff2");
 }
 .material-icon {
   font-family: "Material Symbols Rounded";

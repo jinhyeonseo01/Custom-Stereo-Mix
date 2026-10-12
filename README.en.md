@@ -10,7 +10,7 @@
 
 Custom Stereo Mix is a Windows app for **mixing playback loopbacks, microphones and virtual capture inputs into multiple output devices**. Simple mode keeps everyday playback routing and microphone controls. Advanced mode lets you connect several mixes with nodes and edges. With a virtual audio cable, Discord, OBS, recording or STT apps can receive a mix as an input.
 
-This README describes the **2.0.0 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
+This README describes the **2.0.1 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
 
 ## Features
 
@@ -54,12 +54,16 @@ Enable the header toggle, then:
 1. Add playback, capture, mix and output nodes from **Add node** or the device library.
 2. Drag source ports into mix inputs, then mix ports into outputs. The inspector's connection selector is an alternative.
 3. Adjust each send's gain and mute inside the mix. One source can feed several mixes; one mix can feed several outputs.
-4. Open **…** for device and processing controls. Click an edge for send gain, mute or deletion.
+4. **Right-click** a node or open **…** for activation, mute, inspector and delete. Clicking a node or choosing **Inspector** opens the shared right panel. Click an edge for send gain, mute or deletion.
 5. Use **Start all / Stop all** for connected mixes.
 
 **0 dB is the slider centre.** The left half covers -60..0 dB, the right half 0..+12 dB. Numeric input is available. Double-click or press `0` to reset; arrow keys change 0.1 dB, Shift+arrows 1 dB.
 
-Gain, mute and processing can change while running. **Stop before changing devices, nodes or connection structure.** Duplicate output endpoints and detected playback/virtual-cable return paths are rejected.
+The inspector orders controls as **activation → audio → identity → processing → connections**. **Disabling** excludes a node from processing while retaining its connections and settings; nodes turn grey and routes become dashed. **Muting** keeps the node active and only silences audio, with amber feedback. These states are stored independently.
+
+![Node inspector with activation first and the shared context menu](docs/images/node-settings.png)
+
+Gain, mute and processing can change while running. **Stop before changing activation, devices, nodes or connection structure.** Duplicate output endpoints and detected playback/virtual-cable return paths are rejected. Use `Shift+F10` for the node menu; Enter applies numeric edits and Escape cancels them. Advanced-mode node processing lives in the inspector; simple-mode settings retain processing for the selected mix.
 
 <details>
 <summary>Selected-mix dock</summary>
@@ -93,7 +97,7 @@ Closing or minimizing hides the app to the tray by default and preserves routing
 
 ![Virtual cable setup guide](docs/images/usage-guide.png)
 
-Scroll settings for processing, engine parameters and reset. Language changes apply immediately without restarting audio.
+Scroll settings for engine parameters and reset. Node processing is in the advanced-mode inspector, while simple mode offers selected-mix processing in settings. Language changes apply immediately without restarting audio.
 
 </details>
 
@@ -113,7 +117,7 @@ The C# build restores npm dependencies and builds the React frontend.
 | Task | Command | Output |
 |---|---|---|
 | Folder distribution | `.\build_exe.ps1` | `artifacts\webview2\` |
-| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.0-Setup-x64.exe` |
+| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.1-Setup-x64.exe` |
 
 Installer builds require Inno Setup 7. Pass `-IsccPath 'C:\path\ISCC.exe'` for a custom location. The default version lives in `Directory.Build.props`. Use `-RegenerateIcons` only when changing app-icon sources. See [release documentation](docs/RELEASING.md) for tagged releases and updates.
 

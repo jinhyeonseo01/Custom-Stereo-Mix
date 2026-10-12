@@ -94,6 +94,26 @@ static class GraphTests
             Check(Math.Abs(stats.CorrectionPpm) <= 2000.01, "Correction escaped bounds.");
         }
     }
+    public static void ActivationAndMute()
+    {
+        var graph = Sample();
+        var disabled = graph with { Nodes = graph.Nodes.Select(n => n.Id == "b1" ? n with { Enabled = false } : n).ToArray() };
+        Check(GraphValidator.ActiveNodeIds(disabled).SetEquals(new[] { "m", "b2", "o2" }), "Disabled bus still activated its exclusive devices.");
+        Check(disabled.Edges.SequenceEqual(graph.Edges), "Disabling changed saved connections.");
+        var sources = new Dictionary<string, float[]> { ["a"] = Enumerable.Repeat(.25f, 64).ToArray(), ["m"] = Enumerable.Repeat(.5f, 64).ToArray() };
+        var disabledMixer = new GraphMixer(disabled, 2, 32);
+        disabledMixer.Process(sources, 32);
+        Check(!disabledMixer.Blocks.ContainsKey("b1") && !disabledMixer.Blocks.ContainsKey("a") && !disabledMixer.Blocks.ContainsKey("o1"), "Disabled route allocated processing blocks.");
+        Check(disabledMixer.Blocks["o2"].All(v => Math.Abs(v - .5) < .0001), "Disabled bus interrupted the other mix.");
+        var muted = graph with { Nodes = graph.Nodes.Select(n => n.Id == "b1" ? n with { Muted = true } : n).ToArray() };
+        Check(GraphValidator.SameTopology(graph, muted) && GraphValidator.ActiveNodeIds(muted).Count == 6, "Mute removed a processing route.");
+        var mixer = new GraphMixer(graph, 2, 32);
+        mixer.Process(sources, 32);
+        mixer.UpdateParameters(muted);
+        for (int i = 0; i < 20; i++) mixer.Process(sources, 32);
+        Check(mixer.Blocks["o1"].All(v => Math.Abs(v) < .0001) && mixer.Blocks["o2"].All(v => Math.Abs(v - .5) < .0001), "Node mute silenced the wrong mix.");
+        Check(!GraphValidator.SameTopology(graph, disabled), "Activation was treated as a live gain parameter.");
+    }
     public static void BridgeAndPersistence() => RunBridge().GetAwaiter().GetResult();
     public static void StoreMigrationBackup() => RunStore().GetAwaiter().GetResult();
     static async Task RunStore()
@@ -137,6 +157,8 @@ static class GraphTests
         var changed = graph with { Nodes = graph.Nodes.Select(n => n.Kind == "bus" ? n with { GainDb = -6 } : n).ToArray() };
         Check((await Call("graph", new { project = changed, revision = model.GraphRevision })).GetProperty("ok").GetBoolean(), "Runtime gain rejected.");
         Check(!(await Call("graph", new { project = changed with { Edges = [] }, revision = model.GraphRevision })).GetProperty("ok").GetBoolean(), "Runtime topology changed.");
+        var disabledWhileRunning = changed with { Nodes = changed.Nodes.Select(n => n.Id == "mix" ? n with { Enabled = false } : n).ToArray() };
+        Check(!(await Call("graph", new { project = disabledWhileRunning, revision = model.GraphRevision })).GetProperty("ok").GetBoolean() && model.Graph.Nodes.Single(n => n.Id == "mix").Enabled, "Running activation changed or mutated saved state.");
         await model.ShutdownAsync();
         Check(store.Value.Graph?.Nodes.Length == graph.Nodes.Length && !store.Value.AdvancedMode, "Graph/mode not saved.");
         var restarted = new MainWindowViewModel(new FakeDevices(), new TestGraphRouter(), store);

@@ -1,6 +1,6 @@
 import { t, setLanguage, type MessageKey } from "./i18n";
 import type { AppState, Settings, WebViewBridge } from "./types";
-import { previewGraph, graphError, sameTopology } from "./advanced/graph";
+import { previewGraph, graphError, sameTopology, activeNodeIds, signalNodeIds } from "./advanced/graph";
 const defaults: Settings = {
   language: "ko-KR",
   startWithWindows: false,
@@ -26,8 +26,9 @@ export function createPreviewBridge(): WebViewBridge {
     } catch { /* Preview storage is optional. */ }
     return previewGraph();
   };
+  const initialGraph = cachedGraph();
   let state: AppState = {
-    graph: cachedGraph(), graphRevision: 0,
+    graph: initialGraph, graphRevision: 0,
     advancedMode: new URLSearchParams(location.search).has("advanced"), simpleGraph: false,
     simpleBusId: null,
     revision: 0,
@@ -77,12 +78,12 @@ export function createPreviewBridge(): WebViewBridge {
     isRouting: false,
     canEditRoute: true,
     canEditSettings: true,
-    isStartEnabled: true,
+    isStartEnabled: activeNodeIds(initialGraph).size > 0,
     isStopEnabled: false,
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
     trayHint: "TrayContinues",
-    appVersion: "v2.0.0",
+    appVersion: "v2.0.1",
     updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
   isDownloadingUpdate: false,
@@ -100,11 +101,12 @@ export function createPreviewBridge(): WebViewBridge {
   const emit = (data: unknown) =>
     listeners.forEach((fn) => fn(new MessageEvent("message", { data })));
   setInterval(
-    () =>
+    () => {
+      const signal = state.isRouting ? signalNodeIds(state.graph) : new Set<string>();
       emit({
         type: "meter",
         meter: {
-          nodes: Object.fromEntries(state.graph.nodes.map((n, i) => [n.id, { rms: state.isRouting && !n.muted ? .12 + .08 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, peak: state.isRouting && !n.muted ? .24 + .3 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, clipped: false }])),
+          nodes: Object.fromEntries(state.graph.nodes.map((n, i) => [n.id, { rms: signal.has(n.id) ? .12 + .08 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, peak: signal.has(n.id) ? .24 + .3 * Math.abs(Math.sin(Date.now() / 800 + i)) : 0, clipped: false }])),
           errors: {},
           levelPercent: state.isRouting ? 18 : 0,
           signalState: t(state.isRouting ? "SignalDetected" : "NoSignal"),
@@ -116,7 +118,8 @@ export function createPreviewBridge(): WebViewBridge {
               )
             : [],
         },
-      }),
+      });
+    },
     100,
   );
   return {
@@ -152,6 +155,7 @@ export function createPreviewBridge(): WebViewBridge {
           state.guideDraft = Boolean(payload.dontShowAgain);
           break;
         case "start":
+          if (!activeNodeIds(state.graph).size) { setTimeout(() => emit({ type: "response", id, ok: false, error: t("GraphIncomplete") }), 20); return; }
           state.isRouting = true;
           state.canEditRoute = false;
           state.isStartEnabled = false;
@@ -202,6 +206,7 @@ export function createPreviewBridge(): WebViewBridge {
           break;
       }
       state.revision++;
+      state.isStartEnabled = !state.isRouting && activeNodeIds(state.graph).size > 0;
       try { sessionStorage.setItem("stereo-preview-graph", JSON.stringify(state.graph)); } catch { }
       setLanguage(state.settings.language);
       const snapshot = structuredClone(state);

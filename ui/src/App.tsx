@@ -592,8 +592,8 @@ function SettingsPage({ state, act, patch }: Actions) {
           {t("TrayDisabledHint")}
         </p>
       </section>
-      <section className="card settings-card">
-        <h3>{t("AudioProcessing")}</h3>
+      {state.advancedMode ? <p className="inset-note caption">{t("GraphNodeSettingsHint")}</p> : <section className="card settings-card">
+        <h3>{processingBus ? t("GraphSelectedProcessing", nodeName(processingBus)) : t("AudioProcessing")}</h3>
         <Switch
           label={t("ReduceLoudSounds")}
           description={t("CompressorHint")}
@@ -636,7 +636,7 @@ function SettingsPage({ state, act, patch }: Actions) {
             </label>
           </div>
         )}
-      </section>
+      </section>}
       <section className="card settings-card">
         <h3>{t("AudioEngine")}</h3>
         <div className="two-fields">

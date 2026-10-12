@@ -11,6 +11,7 @@ export const AudioLines = symbol("graphic_eq"), CircleHelp = symbol("help"), Set
   PanelBottom = symbol("width_full"), MoreHorizontal = symbol("more_horiz"), Undo2 = symbol("undo"),
   Redo2 = symbol("redo"), ArrowDownToLine = symbol("download"), ArrowUpFromLine = symbol("upload"),
   Settings2 = symbol("settings"), LayoutGrid = symbol("grid_view"), ZoomIn = symbol("zoom_in"), ZoomOut = symbol("zoom_out");
+export const Power = symbol("power_settings_new"), VolumeOff = symbol("volume_off"), Trash = symbol("delete");
 const icons = {
   logo: AudioLines, help: CircleHelp, settings: Settings, speaker: Volume2,
   cable: Cable, mic: Mic, refresh: RefreshCw, play: Play, stop: Square,
