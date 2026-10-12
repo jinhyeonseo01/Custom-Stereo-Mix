@@ -69,7 +69,7 @@
 
 설치기는 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)에서 받을 수 있습니다. 첫 릴리즈는 `vX.Y.Z` 태그를 푸시하면 생성됩니다. 직접 빌드하려면 아래 [빌드 안내](#build)를 참고하세요.
 
-- **설치기:** `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe`
+- **설치기:** `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
 - **폴더 배포:** `artifacts\webview2\CustomStereoMix.App.exe` 실행
 
 설치기는 사용자별 경로에 설치합니다. WebView2 Runtime 설치가 필요하면 인터넷 연결이 필요합니다. VB-CABLE의 드라이버 설치에는 별도로 관리자 권한이 필요합니다.
@@ -181,7 +181,7 @@ Inno Setup이 기본 경로에 설치되어 있거나 `ISCC.exe`가 PATH에 있�
 | 산출물 | 기본 경로 |
 | --- | --- |
 | 앱 실행 파일 및 필수 파일 | `artifacts\webview2\` |
-| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe` |
+| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
 
 기본 버전은 `Directory.Build.props`에서 관리합니다. 설치기 스크립트의 `-Version`으로도 지정할 수 있으며 파일 이름에 해당 버전이 반영됩니다.
 

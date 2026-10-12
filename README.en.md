@@ -50,7 +50,7 @@ For another virtual cable, send audio to its playback endpoint and select the pa
 
 Download the installer from [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases), or [build from source](#build). Pushing a `vX.Y.Z` tag creates a release through GitHub Actions.
 
-- Installer: `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe`
+- Installer: `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
 - Folder distribution: run `artifacts\webview2\CustomStereoMix.App.exe`
 
 Installation uses a per-user directory. Internet access is needed if WebView2 must be installed. VB-CABLE driver installation requires administrator privileges separately.
@@ -153,7 +153,7 @@ The script publishes the app, downloads the official WebView2 bootstrapper, chec
 | Output | Default path |
 | --- | --- |
 | App and required files | `artifacts\webview2\` |
-| Installer | `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe` |
+| Installer | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
 
 The default version comes from `Directory.Build.props`. The installer's `-Version` argument overrides it for the app and installer.
 

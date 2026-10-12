@@ -64,7 +64,7 @@ export function createPreviewBridge(): WebViewBridge {
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
     trayHint: "TrayContinues",
-    appVersion: "v1.2.0",
+    appVersion: "v1.2.2",
     updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
     latestVersion: null,

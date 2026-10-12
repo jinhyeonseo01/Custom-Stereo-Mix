@@ -50,7 +50,7 @@
 
 インストーラーは[GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)から入手できます。`vX.Y.Z` タグのプッシュで自動リリースされます。[ソースからビルド](#build)することも可能です。
 
-- インストーラー: `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe`
+- インストーラー: `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
 - フォルダー配布: `artifacts\webview2\CustomStereoMix.App.exe` を実行
 
 ユーザー別のフォルダーにインストールします。WebView2の追加インストールにはインターネット接続が必要です。VB-CABLEドライバーの導入には別途管理者権限が必要です。
@@ -153,7 +153,7 @@ Inno Setupが標準の場所またはPATHにある場合:
 | 出力 | 初期パス |
 | --- | --- |
 | アプリと必要なファイル | `artifacts\webview2\` |
-| インストーラー | `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe` |
+| インストーラー | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
 
 初期バージョンは `Directory.Build.props` で管理します。`-Version` を指定するとアプリとインストーラーのバージョンを上書きできます。
 

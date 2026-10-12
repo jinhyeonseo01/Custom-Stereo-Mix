@@ -50,7 +50,7 @@
 
 可从 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)下载安装程序，或[从源码构建](#build)。推送 `vX.Y.Z` 标签后，GitHub Actions 会创建发布。
 
-- 安装程序：`artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe`
+- 安装程序：`artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
 - 文件夹分发：运行 `artifacts\webview2\CustomStereoMix.App.exe`
 
 应用安装在当前用户目录。需要安装 WebView2 时必须联网。VB-CABLE 驱动安装另需管理员权限。
@@ -153,7 +153,7 @@ Inno Setup 位于默认安装路径或 PATH 中时：
 | 产物 | 默认路径 |
 | --- | --- |
 | 应用及必需文件 | `artifacts\webview2\` |
-| Windows x64 安装程序 | `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe` |
+| Windows x64 安装程序 | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
 
 默认版本由 `Directory.Build.props` 管理。安装脚本的 `-Version` 参数可覆盖应用版本和安装程序版本。
 

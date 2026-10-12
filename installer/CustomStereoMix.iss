@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.0"
+  #define AppVersion "1.2.2"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\webview2"
