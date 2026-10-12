@@ -1,6 +1,7 @@
 import { t, languages } from "./i18n";
 import React, {
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -77,7 +78,7 @@ export default function App() {
               act(state.view === "help" ? "closeView" : "openHelp")
             }
             title={t("GuideExtraSetup")}
-            aria-pressed={state.view === "help"}
+            aria-haspopup="dialog" aria-expanded={state.view === "help"}
           >
             <Icon name="help" />
             <span>{t("Guide")}</span>
@@ -87,7 +88,7 @@ export default function App() {
             onClick={() =>
               act(state.view === "settings" ? "closeView" : "openSettings")
             }
-            aria-pressed={state.view === "settings"}
+            aria-haspopup="dialog" aria-expanded={state.view === "settings"}
           >
             <Icon name="settings" />
             <span>{t("Settings")}</span>
@@ -113,65 +114,19 @@ export default function App() {
               )}
             </div>
           )}
-          {state.view === "main" && (
-            <MainPage state={state} act={act} patch={patch} />
-          )}
-          {state.view === "settings" && (
-            <SettingsPage state={state} act={act} patch={patch} />
-          )}
-          {state.view === "help" && <HelpPage />}
+          <MainPage state={state} act={act} patch={patch} />
         </div>
       </main>
       <footer className="app-footer">
-        {state.view === "help" ? (
-          <>
-            <label className="check-label">
-              <input
-                type="checkbox"
-                checked={state.guideDraft}
-                onChange={(e) =>
-                  act("guideDraft", { dontShowAgain: e.target.checked })
-                }
-              />
-              {t("DontShowAgain")}
-            </label>
-            <button className="button" onClick={() => act("closeView")}>
-              {t("Close")}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="footer-copy">
-              <strong>{state.engineLine}</strong>
-              <span>{state.trayHint}</span>
-            </div>
-            {state.view === "settings" ? (
-              <button className="button" onClick={() => act("closeView")}>
-                <Icon name="back" size={16} />
-                {t("Back")}
-              </button>
-            ) : (
-              <button
-                className={`button route-action ${state.isRouting ? "danger" : "primary"}`}
-                disabled={
-                  state.busy ||
-                  (state.isRouting
-                    ? !state.isStopEnabled
-                    : !state.isStartEnabled)
-                }
-                onClick={() => act(state.isRouting ? "stop" : "start")}
-              >
-                <Icon name={state.isRouting ? "stop" : "play"} size={17} />
-                {state.busy
-                  ? t("Working")
-                  : state.isRouting
-                    ? t("StopRouting")
-                    : t("StartRouting")}
-              </button>
-            )}
-          </>
-        )}
+        <div className="footer-copy"><strong>{state.engineLine}</strong><span>{state.trayHint}</span></div>
+        <button className={`button route-action ${state.isRouting ? "danger" : "primary"}`}
+          disabled={state.busy || (state.isRouting ? !state.isStopEnabled : !state.isStartEnabled)}
+          onClick={() => act(state.isRouting ? "stop" : "start")}>
+          <Icon name={state.isRouting ? "stop" : "play"} size={17} />
+          {t(state.busy ? "Working" : state.isRouting ? "StopRouting" : "StartRouting")}
+        </button>
       </footer>
+      <PanelDialog state={state} act={act} patch={patch} error={error} />
       <UpdateDialog state={state} act={act} />
     </div>
   );
@@ -182,6 +137,43 @@ type Actions = {
   act: (c: Command, p?: unknown) => Promise<boolean>;
   patch: (p: Patch) => Promise<boolean>;
 };
+function PanelDialog({ state, act, patch, error }: Actions & { error: string }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (state.view !== "main") {
+      if (!dialog.current?.open) {
+        trigger.current = document.activeElement as HTMLElement;
+        dialog.current?.showModal();
+      }
+      const content = dialog.current?.querySelector(".panel-content");
+      if (content) content.scrollTop = 0;
+    } else if (dialog.current?.open) {
+      dialog.current.close();
+      if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true });
+    }
+  }, [state.view]);
+  return <dialog ref={dialog} className="panel-dialog" aria-labelledby="panel-title"
+    onCancel={(event) => { event.preventDefault(); void act("closeView"); }}>
+    <div className="panel-layout">
+      <header className="panel-header">
+        <div><h2 id="panel-title">{t(state.view === "help" ? "GuideTitle" : "Settings")}</h2>
+          <p className="caption">{t(state.view === "help" ? "GuideSubtitle" : "AutoSaveHint")}</p></div>
+        <button autoFocus className="icon-button" aria-label={t("Close")} onClick={() => act("closeView")}><Icon name="close" /></button>
+      </header>
+      <div className="panel-content">
+        {(error || state.noticeText) && <div className="notice" role="alert">{error || state.noticeText}</div>}
+        {state.view === "settings" && <SettingsPage state={state} act={act} patch={patch} />}
+        {state.view === "help" && <HelpPage />}
+      </div>
+      <footer className="panel-footer">
+        {state.view === "help" && <label className="check-label"><input type="checkbox" checked={state.guideDraft}
+          onChange={(e) => act("guideDraft", { dontShowAgain: e.target.checked })} />{t("DontShowAgain")}</label>}
+        <button className="button" onClick={() => act("closeView")}>{t("Close")}</button>
+      </footer>
+    </div>
+  </dialog>;
+}
 function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [opening, setOpening] = useState(false);
@@ -195,8 +187,7 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
     setOpening(true);
     const ok = await act("downloadUpdate");
     setOpening(false);
-    if (ok) await act("dismissUpdate");
-    else setError(t("InstallerLinkFailed"));
+    if (!ok) setError(t("InstallerLinkFailed"));
   }
   return (
     <dialog
@@ -204,7 +195,7 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
       aria-labelledby="update-dialog-title"
       onCancel={(event) => {
         event.preventDefault();
-        void act("dismissUpdate");
+        if (!state.isDownloadingUpdate) void act("dismissUpdate");
       }}
     >
       <div className="dialog-body">
@@ -213,6 +204,12 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
           {state.appVersion} → {state.latestVersion}
         </p>
         <p>{t("UpdateInstallHint")}</p>
+        {state.downloadMessage && <p role="status">{state.downloadMessage}</p>}
+        {state.isDownloadingUpdate && <progress aria-label={t("UpdateDownloading")} max={state.downloadProgress?.total ?? undefined}
+          value={state.downloadProgress?.total ? state.downloadProgress.received : undefined} />}
+        {state.isDownloadingUpdate && state.downloadProgress?.total && <p className="download-size">
+          {Math.min(100, Math.round(state.downloadProgress.received / state.downloadProgress.total * 100))}% · {(state.downloadProgress.received / 1048576).toFixed(1)} / {(state.downloadProgress.total / 1048576).toFixed(1)} MB
+        </p>}
         {state.hasReleasePage && (
           <button className="button small" onClick={() => act("openRelease")}>
             <Icon name="external" size={14} />
@@ -221,15 +218,15 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
         )}
         {error && <p role="alert">{error}</p>}
         <div className="dialog-actions">
-          <button className="button" onClick={() => act("dismissUpdate")}>
-            {t("Later")}
+          <button className="button" onClick={() => act(state.isDownloadingUpdate ? "cancelUpdateDownload" : "dismissUpdate")}>
+            {t(state.isDownloadingUpdate ? "Cancel" : "Later")}
           </button>
           <button
             className="button primary"
-            disabled={!state.hasUpdateInstaller || opening}
+            disabled={!state.hasUpdateInstaller || opening || state.isDownloadingUpdate}
             onClick={openInstaller}
           >
-            {opening ? t("Opening") : t("DownloadInstaller")}
+            {t(state.isDownloadingUpdate ? "UpdateDownloading" : state.updateDownloaded ? "InstallUpdate" : "DownloadInstaller")}
           </button>
         </div>
       </div>
@@ -252,13 +249,16 @@ function DeviceSelect({
   onChange: (id: string) => void;
 }) {
   const current = devices.find((d) => d.id === selected);
+  const id = useId();
   return (
-    <label className="device-field">
-      <span className="field-title">
+    <div className="device-field">
+      <label className="field-title" htmlFor={id}>
         <Icon name={icon} size={16} />
         {label}
-      </span>
+      </label>
       <select
+        id={id}
+        aria-describedby={`${id}-hint`}
         value={selected ?? ""}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
@@ -273,10 +273,10 @@ function DeviceSelect({
           </option>
         ))}
       </select>
-      <span className="caption">
+      <span className="caption" id={`${id}-hint`}>
         {current?.summary ?? t("RefreshDeviceHint")}
       </span>
-    </label>
+    </div>
   );
 }
 function MainPage({ state, act, patch }: Actions) {
@@ -473,8 +473,9 @@ function Range({
   const [draft, setDraft] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragging = useRef(false);
+  const committed = useRef(value);
   useEffect(() => {
-    if (!dragging.current) setDraft(value);
+    if (!dragging.current && !timer.current) { setDraft(value); committed.current = value; }
   }, [value]);
   useEffect(
     () => () => {
@@ -485,9 +486,10 @@ function Range({
   function commit(n: number) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    onChange(n);
+    if (n !== committed.current) { committed.current = n; onChange(n); }
   }
   return (
+    <div className="range-control">
     <input
       type="range"
       aria-label={label}
@@ -503,7 +505,7 @@ function Range({
         const n = Number(e.target.value);
         setDraft(n);
         if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onChange(n), 80);
+        timer.current = setTimeout(() => commit(n), 80);
       }}
       onPointerUp={(e) => {
         dragging.current = false;
@@ -513,12 +515,17 @@ function Range({
         dragging.current = false;
         commit(Number(e.currentTarget.value));
       }}
+      onPointerCancel={(e) => { dragging.current = false; commit(Number(e.currentTarget.value)); }}
       style={
         {
           "--range-fill": `${((draft - min) / (max - min)) * 100}%`,
         } as React.CSSProperties
       }
     />
+    <div className="range-ticks" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => <span key={i}><i />{i === 0 || i === 2 || i === 4 ? Number((min + (max - min) * i / 4).toFixed(1)) : ""}</span>)}
+    </div>
+    </div>
   );
 }
 function Numeric({
@@ -547,7 +554,7 @@ function Numeric({
       setDraft(String(current));
       return;
     }
-    if (!(await patch({ [name]: Number(draft) }))) setDraft(String(current));
+    if (Number(draft) !== current && !(await patch({ [name]: Number(draft) }))) setDraft(String(current));
   }
   return (
     <label className="numeric-field">
@@ -577,10 +584,6 @@ function SettingsPage({ state, act, patch }: Actions) {
   }, [resetOpen]);
   return (
     <>
-      <div className="page-heading">
-        <h2>{t("Settings")}</h2>
-        <p className="caption">{t("AutoSaveHint")}</p>
-      </div>
       <section className="card settings-card">
         <div className="section-heading">
           <div>
@@ -589,7 +592,7 @@ function SettingsPage({ state, act, patch }: Actions) {
           </div>
           <button
             className="button"
-            disabled={state.updating}
+            disabled={state.updating || state.isDownloadingUpdate}
             onClick={() => act("checkUpdates")}
           >
             {state.updating ? t("Checking") : t("CheckUpdates")}
@@ -607,6 +610,8 @@ function SettingsPage({ state, act, patch }: Actions) {
       </section>
       <section className="card settings-card">
         <h3>{t("AppBehavior")}</h3>
+        <Switch label={t("StartWithWindows")} description={t("StartupHint")} value={state.settings.startWithWindows}
+          disabled={!state.canEditSettings} onChange={(startWithWindows) => patch({ startWithWindows })} />
         <label className="device-field language-field">
           <span className="field-title">{t("SettingsLanguage")}</span>
           <select
@@ -724,6 +729,7 @@ function SettingsPage({ state, act, patch }: Actions) {
           {t("EngineDefaults")}
           <br />
           {t("StopBeforeEngineChange")}
+          <br />{t("EngineBufferHint")}
         </p>
       </section>
       <section className="card settings-card">
@@ -773,10 +779,6 @@ function HelpPage() {
   const [error, setError] = useState("");
   return (
     <>
-      <div className="page-heading">
-        <h2>{t("GuideTitle")}</h2>
-        <p className="caption">{t("GuideSubtitle")}</p>
-      </div>
       <section className="card settings-card">
         <h3>{t("GuideExtraSetup")}</h3>
         <p>

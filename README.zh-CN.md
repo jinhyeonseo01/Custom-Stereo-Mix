@@ -50,7 +50,7 @@
 
 可从 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)下载安装程序，或[从源码构建](#build)。推送 `vX.Y.Z` 标签后，GitHub Actions 会创建发布。
 
-- 安装程序：`artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
+- 安装程序：`artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
 - 文件夹分发：运行 `artifacts\webview2\CustomStereoMix.App.exe`
 
 应用安装在当前用户目录。需要安装 WebView2 时必须联网。VB-CABLE 驱动安装另需管理员权限。
@@ -116,7 +116,9 @@ dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Relea
 .\build_exe.ps1
 ```
 
-脚本依次检查 npm 依赖、重新生成应用图标与 favicon，再执行 `dotnet publish`。它只是便捷工具，并非必须使用的独立构建系统。结果输出到 `artifacts\webview2\`，为包含 .NET 的 Windows x64 分发版本。
+构建使用已提交的图标。修改图标源文件后，可使用 `-RegenerateIcons` 或 `tools/build_icons.ps1` 重新生成。
+
+脚本依次检查 npm 依赖、构建 React，再执行 `dotnet publish`。它只是便捷工具，并非必须使用的独立构建系统。结果输出到 `artifacts\webview2\`，为包含 .NET 的 Windows x64 分发版本。
 
 ### 直接执行发布命令
 
@@ -153,7 +155,7 @@ Inno Setup 位于默认安装路径或 PATH 中时：
 | 产物 | 默认路径 |
 | --- | --- |
 | 应用及必需文件 | `artifacts\webview2\` |
-| Windows x64 安装程序 | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
+| Windows x64 安装程序 | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
 
 默认版本由 `Directory.Build.props` 管理。安装脚本的 `-Version` 参数可覆盖应用版本和安装程序版本。
 
@@ -207,7 +209,9 @@ dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c
 
 界面准备完成后，每次启动会在后台检查一次 GitHub Releases。只有更高的正式 `vX.Y.Z` 版本且 Windows x64 安装程序已就绪时才弹出提示。点击**稍后**关闭后，仍可从设置中的**检查更新**重新查询。
 
-**下载安装程序**会在浏览器中打开已验证的官方链接。运行下载的安装程序前，请从托盘退出应用。**查看更新内容**打开对应版本的发布页面。没有发布、离线、限流或服务器错误时仍可正常操作音频。草稿与预发布版本不作为更新。
+**下载安装程序**会在应用内显示进度并使用 SHA-256 验证。完成并确认后，应用停止音频传输、保存设置、退出并自动启动安装程序。安装完成后可重新运行应用。手动启动的安装程序也会提示关闭正在运行的应用，包括托盘中的应用。**查看更新内容**打开发布页面。
+
+开始菜单快捷方式和 Windows 登录时启动是独立的安装选项。自动启动也可在设置中切换，升级时保留当前选择；卸载时仅删除此应用的 Run 和 StartupApproved 项。自动启动仅打开应用，音频传输需手动开始。使用说明和设置以弹出面板显示，按 Esc 或关闭即可返回。
 
 ## 设置和诊断
 

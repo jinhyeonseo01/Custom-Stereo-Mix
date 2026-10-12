@@ -1,7 +1,8 @@
 param(
     [string]$IsccPath,
     [string]$Version,
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'artifacts\setup')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'artifacts\setup'),
+    [switch]$RegenerateIcons
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Version) {
@@ -15,7 +16,7 @@ if (-not $IsccPath) {
     else {
         $locations = @(
             (Join-Path ${env:ProgramFiles} 'Inno Setup 7\ISCC.exe'),
-            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 7\ISCC.exe'),
             (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe')
         )
         $IsccPath = $locations | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
@@ -41,7 +42,7 @@ if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notm
     throw 'WebView2 Runtime bootstrapper signature validation failed.'
 }
 $publishFolder = Join-Path $PSScriptRoot 'artifacts\webview2'
-& (Join-Path $PSScriptRoot 'tools\build_icons.ps1')
+if ($RegenerateIcons) { & (Join-Path $PSScriptRoot 'tools\build_icons.ps1') }
 dotnet publish (Join-Path $PSScriptRoot 'src\CustomStereoMix.App\CustomStereoMix.App.csproj') -c Release -r win-x64 --self-contained true -p:Version=$Version --output $publishFolder
 if ($LASTEXITCODE -ne 0) { throw "Application publish failed: $LASTEXITCODE" }
 & $IsccPath "/DAppVersion=$Version" "/DPublishDir=$publishFolder" "/DSetupOutputDir=$OutputDirectory" (Join-Path $PSScriptRoot 'installer\CustomStereoMix.iss')

@@ -12,6 +12,12 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IAudioRouteController _router;
     private readonly ISettingsStore _settings;
     private readonly IUpdateService _updates;
+    private readonly IUpdateDownloadService? _downloads;
+    private CancellationTokenSource? _downloadCancellation;
+    private Task _downloadTask = Task.CompletedTask;
+    private bool _isDownloadingUpdate;
+    private UpdateDownloadProgress? _downloadProgress;
+    private LocalizedMessage _downloadMessage = LocalizedMessage.Empty;
     private readonly IUiDispatcher _dispatcher;
     private bool _resetting;
     private LocalizedMessage _settingsMessage = LocalizedMessage.Empty;
@@ -53,6 +59,17 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly string _initialLanguage;
     private string _language;
     private Localizer _localizer;
+    private readonly IStartupService _startup;
+    private bool _startWithWindows;
+    public bool StartWithWindows
+    {
+        get => _startWithWindows;
+        set
+        {
+            _startup.SetEnabled(value);
+            SetProperty(ref _startWithWindows, value);
+        }
+    }
     public string Text(MessageKey key, params object?[] args) => _localizer.Text(key, args);
     public string Describe(Exception exception) => _localizer.Describe(exception);
 
@@ -66,13 +83,15 @@ public sealed class MainWindowViewModel : ObservableObject
             _language = value;
             _localizer = new Localizer(value);
             OnPropertyChanged();
-            foreach (var property in new[] { nameof(StatusText), nameof(TargetMessage), nameof(NoticeText), nameof(UpdateMessage), nameof(SettingsMessage), nameof(SignalState), nameof(MonitorCaption), nameof(EngineLine), nameof(TrayHint), nameof(UpdateButtonText) }) OnPropertyChanged(property);
+            foreach (var property in new[] { nameof(StatusText), nameof(TargetMessage), nameof(NoticeText), nameof(UpdateMessage), nameof(DownloadMessage), nameof(SettingsMessage), nameof(SignalState), nameof(MonitorCaption), nameof(EngineLine), nameof(TrayHint), nameof(UpdateButtonText) }) OnPropertyChanged(property);
             ScheduleSave();
         }
     }
 
-    public MainWindowViewModel(IAudioDeviceService devices, IAudioRouteController router, ISettingsStore settings, IUpdateService? updates = null, IUiDispatcher? dispatcher = null, string? initialLanguage = null)
+    public MainWindowViewModel(IAudioDeviceService devices, IAudioRouteController router, ISettingsStore settings, IUpdateService? updates = null, IUiDispatcher? dispatcher = null, string? initialLanguage = null, IStartupService? startup = null, IUpdateDownloadService? downloads = null)
     {
+        _downloads = downloads;
+        _startup = startup ?? new MemoryStartupService();
         _initialLanguage = LanguageCatalog.Resolve(initialLanguage, System.Globalization.CultureInfo.CurrentUICulture.Name);
         _language = _initialLanguage;
         _localizer = new Localizer(_language);
@@ -87,7 +106,7 @@ public sealed class MainWindowViewModel : ObservableObject
         StartCommand = new AsyncRelayCommand(StartAsync, () => IsStartEnabled);
         StopCommand = new AsyncRelayCommand(StopAsync, () => IsStopEnabled);
         ResetSettingsCommand = new AsyncRelayCommand(ResetSettingsAsync, () => CanResetSettings);
-        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, () => !_shuttingDown && !IsCheckingUpdates);
+        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, () => !_shuttingDown && !IsCheckingUpdates && !IsDownloadingUpdate);
         StartCommand.PropertyChanged += (_, _) => RefreshComputedState();
         StopCommand.PropertyChanged += (_, _) => RefreshComputedState();
         CheckUpdatesCommand.PropertyChanged += (_, _) => OnPropertyChanged(nameof(UpdateButtonText));
@@ -105,6 +124,15 @@ public sealed class MainWindowViewModel : ObservableObject
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public string AppVersion => $"v{typeof(MainWindowViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
     public string UpdateButtonText => Text(IsCheckingUpdates ? MessageKey.Checking : MessageKey.CheckUpdates);
+    public event EventHandler? UpdateReady;
+    public DownloadedUpdate? DownloadedUpdate { get; private set; }
+    public bool IsDownloadingUpdate
+    {
+        get => _isDownloadingUpdate;
+        private set { if (SetProperty(ref _isDownloadingUpdate, value)) CheckUpdatesCommand.NotifyCanExecuteChanged(); }
+    }
+    public UpdateDownloadProgress? DownloadProgress { get => _downloadProgress; private set => SetProperty(ref _downloadProgress, value); }
+    public string DownloadMessage => _localizer.Render(_downloadMessage);
     public bool IsCheckingUpdates
     {
         get => _isCheckingUpdates;
@@ -117,7 +145,7 @@ public sealed class MainWindowViewModel : ObservableObject
     }
     public UpdateCheckResult? UpdateResult { get => _updateResult; private set => SetProperty(ref _updateResult, value); }
     public bool IsUpdateDialogOpen { get => _isUpdateDialogOpen; private set => SetProperty(ref _isUpdateDialogOpen, value); }
-    public void DismissUpdate() => IsUpdateDialogOpen = false;
+    public void DismissUpdate() { if (!IsDownloadingUpdate) IsUpdateDialogOpen = false; }
     public string UpdateMessage => _localizer.Render(_updateMessage);
     private LocalizedMessage UpdateNotice
     {
@@ -392,6 +420,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        try { _startWithWindows = _startup.IsEnabled; }
+        catch (Exception ex) { Notice = new(MessageKey.Detail, ex); }
+        OnPropertyChanged(nameof(StartWithWindows));
         try
         {
             _loadedSettings = await _settings.LoadAsync();
@@ -433,6 +464,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             var result = await _updates.CheckAsync(cancellation.Token);
             if (_shuttingDown) return;
+            if (result.InstallerUrl != UpdateResult?.InstallerUrl) DownloadedUpdate = null;
             UpdateResult = result;
             UpdateNotice = result.Message;
             IsUpdateDialogOpen = result.State == UpdateCheckState.Available;
@@ -450,6 +482,45 @@ public sealed class MainWindowViewModel : ObservableObject
         finally { _updateCancellation = null; IsCheckingUpdates = false; }
     }
 
+    public void CancelUpdateDownload() => _downloadCancellation?.Cancel();
+    public void DownloadUpdate()
+    {
+        if (_shuttingDown || IsDownloadingUpdate) return;
+        if (DownloadedUpdate is not null) { UpdateReady?.Invoke(this, EventArgs.Empty); return; }
+        if (_downloads is null || UpdateResult?.State != UpdateCheckState.Available) throw new InvalidOperationException().WithMessage(MessageKey.ActionUnavailable);
+        _downloadTask = DownloadUpdateAsync(UpdateResult);
+    }
+    private async Task DownloadUpdateAsync(UpdateCheckResult result)
+    {
+        using var cancellation = new CancellationTokenSource();
+        _downloadCancellation = cancellation;
+        IsDownloadingUpdate = true;
+        DownloadProgress = null;
+        _downloadMessage = new(MessageKey.UpdateDownloading);
+        OnPropertyChanged(nameof(DownloadMessage));
+        try
+        {
+            DownloadedUpdate = await _downloads!.DownloadAsync(result, new Progress<UpdateDownloadProgress>(p =>
+            {
+                if (!IsDownloadingUpdate) return;
+                DownloadProgress = p;
+                _downloadMessage = new(p.Verifying ? MessageKey.UpdateVerifying : MessageKey.UpdateDownloading);
+                OnPropertyChanged(nameof(DownloadMessage));
+            }), cancellation.Token);
+            _downloadMessage = new(MessageKey.UpdateReadyToInstall);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { _downloadMessage = new(MessageKey.UpdateDownloadCancelled); }
+        catch (Exception ex) { _downloadMessage = new(MessageKey.UpdateDownloadError, ex); }
+        finally
+        {
+            _downloadCancellation = null;
+            IsDownloadingUpdate = false;
+            OnPropertyChanged(nameof(DownloadMessage));
+            OnPropertyChanged(nameof(DownloadedUpdate));
+        }
+        if (DownloadedUpdate is not null && !_shuttingDown) UpdateReady?.Invoke(this, EventArgs.Empty);
+    }
+
     private async Task ResetSettingsAsync()
     {
         _resetting = true;
@@ -463,6 +534,7 @@ public sealed class MainWindowViewModel : ObservableObject
             IsRouting = false;
             _loadedSettings = new AppSettings();
             ApplySettings(_loadedSettings);
+            StartWithWindows = false;
             Notice = LocalizedMessage.Empty;
             await RefreshDevicesAsync();
             await SaveCurrentSettingsAsync();
@@ -610,10 +682,12 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         _shuttingDown = true;
         _updateCancellation?.Cancel();
+        _downloadCancellation?.Cancel();
         RefreshComputedState();
         try
         {
             await _updateTask;
+            await _downloadTask;
             // A pending Start can still be waiting for settings I/O. Finish it
             // before Stop so it cannot open an audio session after shutdown.
             if (StartCommand.ExecutionTask is { IsCompleted: false } starting) await starting;
@@ -626,10 +700,15 @@ public sealed class MainWindowViewModel : ObservableObject
         catch (Exception ex)
         {
             Notice = new(MessageKey.ShutdownFailed, ex);
-            _shuttingDown = false;
-            RefreshComputedState();
+            CancelShutdown();
             return false;
         }
+    }
+
+    public void CancelShutdown()
+    {
+        _shuttingDown = false;
+        RefreshComputedState();
     }
 
     private void ApplySettings(AppSettings settings)

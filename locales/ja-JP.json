@@ -21,7 +21,7 @@
     "StartRouting": "音声接続を開始",
     "InstallerLinkFailed": "インストーラーのリンクを開けませんでした。設定から再度確認してください。",
     "UpdateAvailableTitle": "新しい更新があります",
-    "UpdateInstallHint": "新しいWindows用インストーラーをダウンロードできます。ダウンロード後、トレイからアプリを終了してインストーラーを実行してください。",
+    "UpdateInstallHint": "アプリがインストーラーをダウンロードして検証し、インストール前に音声転送の停止と終了を確認します。",
     "ReleaseNotes": "変更内容を見る",
     "Later": "後で",
     "Opening": "開いています…",
@@ -165,6 +165,19 @@
     "NoRoute": "接続経路が未選択",
     "NoCableTarget": "仮想ケーブルの送信先が未選択です。",
     "Detail": "{0}",
-    "Empty": ""
+    "Empty": "",
+    "StartWithWindows": "Windowsへのサインイン時に起動",
+    "StartupHint": "サインイン時にアプリを開きます。トレイが有効ならトレイで起動します。音声転送は手動で開始します。",
+    "EngineBufferHint": "バッファは最大保存容量で、250 msの再生待ち時間ではありません。遅延を下げると音切れが増える場合があります。",
+    "UpdateDownloading": "インストーラーをダウンロード中…",
+    "UpdateVerifying": "ダウンロードを検証中…",
+    "UpdateReadyToInstall": "検証完了。インストールを開始できます。",
+    "UpdateChecksumFailed": "ファイルの検証に失敗しました。再度ダウンロードしてください。",
+    "UpdateDownloadFailed": "インストーラーのダウンロードが不完全です。",
+    "UpdateDownloadCancelled": "ダウンロードをキャンセルしました。",
+    "UpdateDownloadError": "ダウンロード失敗: {0}",
+    "UpdateExitConfirmation": "インストーラーのダウンロードと検証が完了しました。音声転送を停止してアプリを終了し、更新をインストールしますか？",
+    "UpdateLaunchFailed": "インストールを開始できませんでした。アプリの終了を確認して再試行してください。{0}",
+    "InstallUpdate": "更新をインストール"
   }
 }

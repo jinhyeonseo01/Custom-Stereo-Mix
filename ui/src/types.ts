@@ -7,6 +7,7 @@ export interface Device {
 }
 export interface Settings {
   language: string;
+  startWithWindows: boolean;
   gainDb: number;
   compressorEnabled: boolean;
   compressorThresholdDb: number;
@@ -43,6 +44,10 @@ export interface AppState {
   appVersion: string;
   updateMessage: string;
   isUpdateDialogOpen: boolean;
+  isDownloadingUpdate: boolean;
+  updateDownloaded: boolean;
+  downloadMessage: string;
+  downloadProgress: { received: number; total: number | null; verifying: boolean } | null;
   latestVersion: string | null;
   hasUpdateInstaller: boolean;
   hasReleasePage: boolean;
@@ -66,6 +71,7 @@ export type Command =
   | "dismissUpdate"
   | "openRelease"
   | "downloadUpdate"
+  | "cancelUpdateDownload"
   | "patch"
   | "openHelp"
   | "openSettings"

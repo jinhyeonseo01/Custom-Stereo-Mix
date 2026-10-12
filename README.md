@@ -69,7 +69,7 @@
 
 설치기는 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)에서 받을 수 있습니다. 첫 릴리즈는 `vX.Y.Z` 태그를 푸시하면 생성됩니다. 직접 빌드하려면 아래 [빌드 안내](#build)를 참고하세요.
 
-- **설치기:** `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
+- **설치기:** `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
 - **폴더 배포:** `artifacts\webview2\CustomStereoMix.App.exe` 실행
 
 설치기는 사용자별 경로에 설치합니다. WebView2 Runtime 설치가 필요하면 인터넷 연결이 필요합니다. VB-CABLE의 드라이버 설치에는 별도로 관리자 권한이 필요합니다.
@@ -140,7 +140,9 @@ dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Relea
 .\build_exe.ps1
 ```
 
-이 스크립트는 **npm 의존성 확인 → 앱 아이콘·favicon 재생성 → `dotnet publish`**를 묶은 편의 도구입니다. 사용이 필수인 별도 빌드 시스템은 아닙니다.
+아이콘은 커밋된 파일을 사용합니다. 원본 아이콘을 변경했다면 `-RegenerateIcons` 옵션이나 `tools/build_icons.ps1`로 재생성하세요.
+
+이 스크립트는 **npm 의존성 확인 → React 빌드 → `dotnet publish`**를 묶은 편의 도구입니다. 사용이 필수인 별도 빌드 시스템은 아닙니다.
 
 결과는 `artifacts\webview2\`에 생성됩니다. .NET을 포함한 Windows x64 배포이며 폴더 전체가 필요합니다.
 
@@ -181,7 +183,7 @@ Inno Setup이 기본 경로에 설치되어 있거나 `ISCC.exe`가 PATH에 있�
 | 산출물 | 기본 경로 |
 | --- | --- |
 | 앱 실행 파일 및 필수 파일 | `artifacts\webview2\` |
-| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
+| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
 
 기본 버전은 `Directory.Build.props`에서 관리합니다. 설치기 스크립트의 `-Version`으로도 지정할 수 있으며 파일 이름에 해당 버전이 반영됩니다.
 
@@ -240,7 +242,9 @@ dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c
 
 앱 화면이 준비되면 시작 시 한 번 GitHub Releases를 백그라운드에서 확인합니다. 더 높은 `vX.Y.Z` 버전의 Windows x64 설치기가 준비되어 있을 때만 팝업이 표시됩니다. **나중에**로 닫아도 설정의 **업데이트 확인**으로 다시 확인할 수 있습니다.
 
-**설치기 다운로드**는 기본 브라우저로 공식 릴리즈 설치기 링크를 엽니다. 다운로드한 설치기를 실행하기 전 트레이에서 앱을 종료하세요. **변경 사항 보기**는 해당 버전의 릴리즈 페이지를 엽니다.
+**설치기 다운로드**를 누르면 앱 안에서 내려받고 SHA-256으로 검증합니다. 완료 후 앱 종료 안내를 확인하면 오디오 전송과 설정 저장을 마친 뒤 설치기를 자동 실행합니다. 설치가 끝나면 앱을 다시 실행할 수 있습니다. 직접 실행한 설치기도 실행 중인 앱을 닫을지 안내하며, 트레이 때문에 종료 안내가 반복되지 않습니다. **변경 사항 보기**는 릴리즈 페이지를 엽니다.
+
+설치기의 시작 메뉴 바로가기와 Windows 로그인 시 자동 실행은 각각 선택할 수 있습니다. 자동 실행은 설정에서도 켜고 끌 수 있으며, 업그레이드 시 현재 선택을 유지합니다. 앱 제거 시 Run 및 StartupApproved에서 이 앱의 항목만 정리합니다. 자동 실행은 앱만 열며 오디오 전송은 직접 시작합니다. 사용법과 설정은 메인 화면 위 팝업 패널로 열리고, Esc 또는 닫기로 돌아갈 수 있습니다.
 
 릴리즈가 없거나 오프라인·조회 제한·서버 오류가 발생해도 앱은 계속 사용할 수 있습니다. 확인 결과는 설정에 표시되며 오디오 시작·중지는 네트워크 응답을 기다리지 않습니다. 초안과 사전 릴리즈는 업데이트 대상에서 제외됩니다.
 

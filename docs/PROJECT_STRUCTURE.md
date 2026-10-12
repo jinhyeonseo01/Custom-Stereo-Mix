@@ -29,7 +29,7 @@ React의 명령은 WebView2 JSON 메시지 → `UiBridge` → `MainWindowViewMod
 
 WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시합니다. 외부 이동·팝업·권한·호스트 객체 접근은 막고, 설치 안내 링크만 호스트가 기본 브라우저로 엽니다. 개발 미리보기의 가짜 오디오 브리지는 프로덕션 번들에서 제거됩니다.
 
-설치기 빌드는 `build_installer.ps1`을 사용합니다. Node 의존성 복원, SVG 기반 다중 해상도 아이콘 생성, .NET self-contained publish와 Inno Setup 컴파일을 수행합니다. 설치 시 WebView2가 없을 때만 공식 런타임 부트스트래퍼를 실행하며 가상 케이블 드라이버는 포함하지 않습니다.
+설치기 빌드는 `build_installer.ps1`을 사용합니다. Node 의존성 복원, React 빌드, .NET self-contained publish와 Inno Setup 컴파일을 수행합니다. 설치 시 WebView2가 없을 때만 공식 런타임 부트스트래퍼를 실행하며 가상 케이블 드라이버는 포함하지 않습니다.
 
 설정은 장치 ID로 저장하며 기본값 복구와 초기화가 같은 공통 검증을 사용합니다. 시작·중지·초기화 처리 중에는 관련 설정을 잠그고, 종료 시 진행 중인 명령을 기다린 후 오디오를 정리하고 저장합니다.
 
@@ -39,3 +39,5 @@ WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시합니
 ## 릴리즈와 업데이트
 
 `.github/workflows/release.yml`은 vX.Y.Z 태그에서 설치기를 빌드하고 GitHub Releases에 게시합니다. `ReleaseVersion`이 태그의 숫자 형식을 정의하고 `GitHubReleaseUpdateService`가 공개 정식 릴리즈와 설치기 링크를 검증합니다. WPF 호스트는 첫 화면 준비 후 백그라운드 확인을 시작하며 `UiBridge`는 업데이트 상태·팝업과 허용된 릴리즈 링크 명령을 React에 연결합니다. 자세한 배포 절차는 [RELEASING.md](RELEASING.md)를 참고하세요.
+
+업데이트 설치기는 앱 내부에서 내려받아 SHA-256 검증 후 부모 앱 종료를 기다리는 별도 실행 모드로 넘깁니다. 자동 실행은 `WindowsStartupService`가 현재 사용자 레지스트리로 관리합니다. 설정과 사용법은 React의 모달 패널로 표시하며 오디오 연결은 유지합니다.

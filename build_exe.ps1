@@ -1,6 +1,6 @@
-param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'artifacts\webview2'))
+param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'artifacts\webview2'), [switch]$RegenerateIcons)
 $ErrorActionPreference = "Stop"
-& "$PSScriptRoot\tools\build_icons.ps1"
+if ($RegenerateIcons) { & "$PSScriptRoot\tools\build_icons.ps1" }
 
 dotnet publish "$PSScriptRoot\src\CustomStereoMix.App\CustomStereoMix.App.csproj" `
     -c Release `

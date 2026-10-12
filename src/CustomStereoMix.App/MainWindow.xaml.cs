@@ -28,7 +28,11 @@ public partial class MainWindow : Window
     public MainWindow(MainWindowViewModel model, string? browserData = null)
     {
         InitializeComponent();
-        SourceInitialized += (_, _) => FitInitialWindow();
+        SourceInitialized += (_, _) =>
+        {
+            FitInitialWindow();
+            System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(SessionMessage);
+        };
         _model = model;
         StartupMessage.Text = model.Text(MessageKey.PreparingInterface);
         RetryButton.Content = model.Text(MessageKey.Retry);
@@ -57,6 +61,7 @@ public partial class MainWindow : Window
         _tray = new Forms.NotifyIcon { Icon = new System.Drawing.Icon(stream), ContextMenuStrip = menu, Text = "Custom Stereo Mix", Visible = model.MinimizeToTray };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) RestoreWindow(); };
         _model.PropertyChanged += ModelChanged;
+        _model.UpdateReady += OnUpdateReady;
         _bridge.Changed += (_, _) => ScheduleState();
         _meterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Background, (_, _) =>
         {
@@ -72,9 +77,29 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _meterTimer.Stop(); _model.PropertyChanged -= ModelChanged;
+            _model.UpdateReady -= OnUpdateReady;
             _tray.Visible = false; _tray.Dispose(); menu.Dispose(); Browser.Dispose();
         };
     }
+
+    private IntPtr SessionMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // Restart Manager requests an actual exit even when close-to-tray is enabled.
+        if ((lParam.ToInt64() & 1) == 0) return IntPtr.Zero;
+        if (message == 0x11) { handled = true; return new IntPtr(1); } // WM_QUERYENDSESSION
+        if (message == 0x16 && wParam != IntPtr.Zero)
+        { handled = true; Dispatcher.BeginInvoke(new Action(async () => await ExitAsync())); }
+        return IntPtr.Zero;
+    }
+
+    private void OnUpdateReady(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(async () =>
+    {
+        if (_exiting || _shutdownComplete || _model.DownloadedUpdate is not { } update) return;
+        RestoreWindow();
+        if (System.Windows.MessageBox.Show(this, _model.Text(MessageKey.UpdateExitConfirmation), "Custom Stereo Mix", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+        try { await ExitAsync(update); }
+        catch (Exception ex) { System.Windows.MessageBox.Show(this, _model.Text(MessageKey.UpdateLaunchFailed, ex), "Custom Stereo Mix", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }));
 
     private void FitInitialWindow()
     {
@@ -270,7 +295,7 @@ public partial class MainWindow : Window
         else await ExitAsync();
     }
 
-    public async Task ExitAsync()
+    public async Task ExitAsync(DownloadedUpdate? update = null)
     {
         if (_exiting || _shutdownComplete) return;
         _exiting = true;
@@ -279,6 +304,13 @@ public partial class MainWindow : Window
             await Initialization;
             _bridge.CommitGuideOnClose();
             if (!await _model.ShutdownAsync()) { RestoreWindow(); return; }
+            // Spawn only after settings/audio shutdown succeeded. The helper then
+            // waits for this process to exit before starting the installer.
+            if (update is not null)
+            {
+                try { UpdateInstallerLauncher.StartHelper(update, _model.Language); }
+                catch { _model.CancelShutdown(); RestoreWindow(); throw; }
+            }
             _shutdownComplete = true;
             Close();
             System.Windows.Application.Current.Shutdown();

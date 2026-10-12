@@ -21,7 +21,7 @@
     "StartRouting": "Start routing",
     "InstallerLinkFailed": "Could not open the installer link. Try again in Settings.",
     "UpdateAvailableTitle": "Update available",
-    "UpdateInstallHint": "A new Windows installer is available. After downloading, exit the app from the tray and run the installer.",
+    "UpdateInstallHint": "The app downloads and verifies the installer, then asks to stop audio routing and close before installation.",
     "ReleaseNotes": "Release notes",
     "Later": "Later",
     "Opening": "Opening…",
@@ -165,6 +165,19 @@
     "NoRoute": "No route selected",
     "NoCableTarget": "No virtual cable target selected.",
     "Detail": "{0}",
-    "Empty": ""
+    "Empty": "",
+    "StartWithWindows": "Start with Windows",
+    "StartupHint": "Open the app at sign-in. With the tray enabled, it starts in the tray. Start audio routing manually.",
+    "EngineBufferHint": "Buffer is the maximum storage capacity, not a 250 ms playback delay. Lower latency can increase dropouts.",
+    "UpdateDownloading": "Downloading installer…",
+    "UpdateVerifying": "Verifying download…",
+    "UpdateReadyToInstall": "Verified. Ready to install.",
+    "UpdateChecksumFailed": "File verification failed. Download again.",
+    "UpdateDownloadFailed": "The installer download is incomplete.",
+    "UpdateDownloadCancelled": "Download cancelled.",
+    "UpdateDownloadError": "Download failed: {0}",
+    "UpdateExitConfirmation": "The installer is downloaded and verified. Stop audio routing, close the app, and install the update?",
+    "UpdateLaunchFailed": "Could not start installation. Check that the app has exited and retry. {0}",
+    "InstallUpdate": "Install update"
   }
 }

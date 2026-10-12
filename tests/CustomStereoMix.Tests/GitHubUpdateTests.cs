@@ -120,7 +120,7 @@ static class GitHubUpdateTests
         var bridge = new UiBridge(vm, openUpdateWebsite: uri => { opened.Add(uri); return Task.CompletedTask; });
         await bridge.HandleAsync(Message("downloadUpdate"));
         await bridge.HandleAsync(Message("openRelease"));
-        Assert(opened.Count == 2 && opened[0] == Installer("v1.10.0") && opened[1].AbsolutePath.EndsWith("/tag/v1.10.0"), "Bridge used unvalidated frontend URL");
+        Assert(opened.Count == 1 && opened[0].AbsolutePath.EndsWith("/tag/v1.10.0"), "Installer was sent to the browser or release URL was unvalidated");
         await bridge.HandleAsync(Message("dismissUpdate")); Assert(!vm.IsUpdateDialogOpen, "Dialog was not dismissed");
         await vm.ShutdownAsync();
     });

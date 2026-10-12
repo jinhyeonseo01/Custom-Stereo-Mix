@@ -38,6 +38,8 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         model.CanEditRoute, model.CanEditSettings, model.IsStartEnabled, model.IsStopEnabled,
         model.CanResetSettings, model.EngineLine, model.TrayHint, model.AppVersion,
         model.UpdateMessage, model.SettingsMessage, model.IsUpdateDialogOpen,
+        model.IsDownloadingUpdate, model.DownloadProgress, model.DownloadMessage,
+        updateDownloaded = model.DownloadedUpdate is not null,
         latestVersion = model.UpdateResult?.LatestVersion,
         hasUpdateInstaller = model.UpdateResult?.State == Core.UpdateCheckState.Available && model.UpdateResult.InstallerUrl is not null,
         hasReleasePage = model.UpdateResult?.ReleasePage is not null,
@@ -45,7 +47,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         updating = model.IsCheckingUpdates,
         settings = new
         {
-            model.Language, model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
+            model.Language, model.StartWithWindows, model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
             model.IsMicMixEnabled, model.MicGainDb, model.SampleRate, model.Channels,
             model.LatencyMilliseconds, model.BufferMilliseconds, model.MinimizeToTray
         }
@@ -88,8 +90,9 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                     _ = model.CheckUpdatesCommand.ExecuteAsync(null);
                     break;
                 case "dismissUpdate": model.DismissUpdate(); break;
-                case "openRelease": await OpenUpdateLinkAsync(installer: false); break;
-                case "downloadUpdate": await OpenUpdateLinkAsync(installer: true); break;
+                case "openRelease": await OpenReleasePageAsync(); break;
+                case "downloadUpdate": model.DownloadUpdate(); break;
+                case "cancelUpdateDownload": model.CancelUpdateDownload(); break;
                 case "patch": ApplyPatch(payload); break;
                 case "openHelp": OpenView("help"); break;
                 case "openSettings": OpenView("settings"); break;
@@ -111,9 +114,9 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         finally { _commands.Release(); }
     }
 
-    private async Task OpenUpdateLinkAsync(bool installer)
+    private async Task OpenReleasePageAsync()
     {
-        var url = installer ? model.UpdateResult?.InstallerUrl : model.UpdateResult?.ReleasePage;
+        var url = model.UpdateResult?.ReleasePage;
         if (url is null || openUpdateWebsite is null || !GitHubReleaseUpdateService.IsReleaseLink(url))
             throw new InvalidOperationException().WithMessage(MessageKey.CannotOpenUpdateLink);
         await openUpdateWebsite(url);
@@ -157,6 +160,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "compressorEnabled": { var b = value.GetBoolean(); actions.Add(() => model.CompressorEnabled = b); break; }
                 case "isMicMixEnabled": { var b = value.GetBoolean(); actions.Add(() => model.IsMicMixEnabled = b); break; }
                 case "minimizeToTray": { var b = value.GetBoolean(); actions.Add(() => model.MinimizeToTray = b); break; }
+                case "startWithWindows": { var b = value.GetBoolean(); actions.Add(() => model.StartWithWindows = b); break; }
                 case "sourceDeviceId": { var d = FindDevice(model.Sources, value); actions.Add(() => model.SelectedSource = d); break; }
                 case "targetDeviceId": { var d = FindDevice(model.Targets, value); actions.Add(() => model.SelectedTarget = d); break; }
                 case "microphoneDeviceId": { var d = FindDevice(model.Microphones, value); actions.Add(() => model.SelectedMicrophone = d); break; }

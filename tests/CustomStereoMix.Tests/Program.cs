@@ -5,6 +5,8 @@ using CustomStereoMix.State;
 
 var tests = new (string Name, Action Body)[]
 {
+    ("installer download verifies checksum, size and source and cleans incomplete files", UpdateDownloadTests.Integrity),
+    ("download preserves audio controls and shutdown cancels it; startup resets cleanly", UpdateDownloadTests.CommandGateAndCancellation),
     ("four language resources preserve keys, placeholders and dynamic errors", LocalizationTests.Resources),
     ("installer language seed resolves with safe OS fallback", LocalizationTests.InstallerSeed),
     ("language switches preserve routing and persist through restart and reset", LocalizationTests.PersistenceAndRouting),

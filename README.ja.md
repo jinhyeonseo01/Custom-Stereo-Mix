@@ -50,7 +50,7 @@
 
 インストーラーは[GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)から入手できます。`vX.Y.Z` タグのプッシュで自動リリースされます。[ソースからビルド](#build)することも可能です。
 
-- インストーラー: `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
+- インストーラー: `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
 - フォルダー配布: `artifacts\webview2\CustomStereoMix.App.exe` を実行
 
 ユーザー別のフォルダーにインストールします。WebView2の追加インストールにはインターネット接続が必要です。VB-CABLEドライバーの導入には別途管理者権限が必要です。
@@ -116,7 +116,9 @@ dotnet run --project src\CustomStereoMix.App\CustomStereoMix.App.csproj -c Relea
 .\build_exe.ps1
 ```
 
-npm依存関係の確認、アプリアイコン・faviconの再生成、`dotnet publish` をまとめた便利なスクリプトです。必須の独自ビルドシステムではありません。結果は.NETを含むWindows x64版として `artifacts\webview2\` に出力されます。
+コミット済みのアイコンを使用します。元のアイコンを変更した場合は `-RegenerateIcons` または `tools/build_icons.ps1` で再生成してください。
+
+npm依存関係の確認、Reactのビルド、`dotnet publish` をまとめた便利なスクリプトです。必須の独自ビルドシステムではありません。結果は.NETを含むWindows x64版として `artifacts\webview2\` に出力されます。
 
 ### 直接配布ビルド
 
@@ -153,7 +155,7 @@ Inno Setupが標準の場所またはPATHにある場合:
 | 出力 | 初期パス |
 | --- | --- |
 | アプリと必要なファイル | `artifacts\webview2\` |
-| インストーラー | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
+| インストーラー | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
 
 初期バージョンは `Directory.Build.props` で管理します。`-Version` を指定するとアプリとインストーラーのバージョンを上書きできます。
 
@@ -205,7 +207,9 @@ dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c
 
 画面の準備後、起動ごとに1回バックグラウンドでGitHub Releasesを確認します。より新しい正式版 `vX.Y.Z` と利用可能なWindows x64インストーラーがある場合のみ通知します。**後で**で閉じても、設定の**更新を確認**から再確認できます。
 
-**インストーラーを入手**はブラウザーで検証済みの公式リンクを開きます。インストーラーを実行する前にトレイから終了してください。**変更内容を見る**はリリースページを開きます。リリースなし、オフライン、アクセス制限、サーバーエラーの場合も音声操作は維持します。下書きとプレリリースは対象外です。
+**インストーラーを入手**でアプリ内ダウンロードとSHA-256検証を行います。完了後に確認すると音声転送を停止して設定を保存し、アプリを終了してインストーラーを自動起動します。インストール完了時に再起動できます。手動で起動したインストーラーも、トレイ内の実行中アプリを閉じるよう案内します。**変更内容を見る**はリリースページを開きます。
+
+スタートメニューのショートカットとWindowsサインイン時の起動は、別々のインストールオプションです。自動起動は設定からも変更でき、更新時に現在の選択を維持します。アンインストール時にこのアプリのRunとStartupApproved項目だけを削除します。音声転送は手動で開始します。使い方と設定はポップアップパネルで開き、Escまたは閉じるで戻れます。
 
 ## 設定と診断
 

@@ -16,24 +16,6 @@ if (-not (Test-Path -LiteralPath $installerPath) -or -not (Test-Path -LiteralPat
 $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ((Get-Content -LiteralPath $checksumPath -Raw).Trim() -cne "$installerHash  $installerName") { throw 'Installer checksum mismatch.' }
 
-function Find-TaggedRelease {
-    # /releases/tags/{tag} only returns published releases. Authenticated list
-    # requests include drafts, and --slurp keeps paginated JSON parseable.
-    $releaseJson = gh api --paginate --slurp "repos/$Repository/releases?per_page=100"
-    if ($LASTEXITCODE -ne 0) { throw 'Release lookup failed; no draft was created.' }
-    $pages = ($releaseJson -join "`n") | ConvertFrom-Json -NoEnumerate
-    $matches = @(
-        foreach ($page in $pages) {
-            foreach ($entry in $page) {
-                if ($entry.tag_name -ceq $Tag) { $entry }
-            }
-        }
-    )
-    if ($matches.Count -gt 1) { throw 'Multiple releases match the tag. Resolve the duplicate drafts before retrying.' }
-    if ($matches.Count -eq 1) { return $matches[0] }
-    return $null
-}
-
 function Invoke-ReleaseJsonRequest([string]$Method, [string]$Endpoint, [hashtable]$Body) {
     $payloadFile = Join-Path ([IO.Path]::GetTempPath()) ("stereomix-release-" + [Guid]::NewGuid().ToString('N') + '.json')
     try {
@@ -50,7 +32,14 @@ if ($ReleaseId -gt 0) {
     if ($LASTEXITCODE -ne 0) { throw 'The specified release ID could not be read.' }
     $release = ($releaseJson -join "`n") | ConvertFrom-Json
 }
-else { $release = Find-TaggedRelease }
+else {
+    # Only check this tag's published release. Draft recovery is explicit by ID,
+    # avoiding full-list scans and token-dependent draft discovery.
+    $lookup = gh api --include --silent "repos/$Repository/releases/tags/$Tag" 2>&1
+    if ($LASTEXITCODE -eq 0) { throw 'The tag already has a published release. Use a new version tag.' }
+    if (-not ($lookup | Where-Object { "$_" -match '^HTTP/[\d.]+ 404(?:\s|$)' })) { throw 'Release lookup failed; no draft was created.' }
+    $release = $null
+}
 if ($null -eq $release) {
     gh api "repos/$Repository/git/ref/tags/$Tag" --silent
     if ($LASTEXITCODE -ne 0) { throw 'Release tag does not exist in the remote repository.' }
@@ -83,7 +72,7 @@ foreach ($assetPath in @($installerPath, $checksumPath)) {
     if ($uploaded.name -cne $assetName -or $uploaded.state -cne 'uploaded' -or $uploaded.size -ne (Get-Item -LiteralPath $assetPath).Length) {
         throw 'Uploaded asset metadata is incomplete; the release remains a draft.'
     }
-    $assetHash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $assetHash = if ($assetPath -eq $installerPath) { $installerHash } else { (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant() }
     if ($uploaded.digest -and $uploaded.digest -cne "sha256:$assetHash") { throw 'Uploaded asset digest mismatch; the release remains a draft.' }
 }
 $published = Invoke-ReleaseJsonRequest PATCH "repos/$Repository/releases/$($release.id)" @{ draft = $false; make_latest = 'legacy' }

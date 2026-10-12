@@ -3,6 +3,19 @@ namespace CustomStereoMix.Core;
 // Stable identifiers shared with locales/*.json and the typed React translator.
 public enum MessageKey
 {
+    StartWithWindows,
+    StartupHint,
+    EngineBufferHint,
+    UpdateDownloading,
+    UpdateVerifying,
+    UpdateReadyToInstall,
+    UpdateChecksumFailed,
+    UpdateDownloadFailed,
+    UpdateDownloadCancelled,
+    UpdateDownloadError,
+    UpdateExitConfirmation,
+    UpdateLaunchFailed,
+    InstallUpdate,
     RequestFailed,
     ConnectingInterface,
     WaitingConnection,

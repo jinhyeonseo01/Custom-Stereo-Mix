@@ -50,7 +50,7 @@ For another virtual cable, send audio to its playback endpoint and select the pa
 
 Download the installer from [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases), or [build from source](#build). Pushing a `vX.Y.Z` tag creates a release through GitHub Actions.
 
-- Installer: `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe`
+- Installer: `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe`
 - Folder distribution: run `artifacts\webview2\CustomStereoMix.App.exe`
 
 Installation uses a per-user directory. Internet access is needed if WebView2 must be installed. VB-CABLE driver installation requires administrator privileges separately.
@@ -116,7 +116,9 @@ The app project invokes npm restoration and the React production build automatic
 .\build_exe.ps1
 ```
 
-This convenience script checks npm dependencies, regenerates icons and favicon, then runs `dotnet publish`. It is not a separate mandatory build system. The result is a self-contained Windows x64 distribution in `artifacts\webview2\`; keep the full folder.
+Builds use committed icons. Use `-RegenerateIcons` or `tools/build_icons.ps1` after changing icon sources.
+
+This convenience script checks npm dependencies, builds React, then runs `dotnet publish`. It is not a separate mandatory build system. The result is a self-contained Windows x64 distribution in `artifacts\webview2\`; keep the full folder.
 
 ### Publish directly
 
@@ -153,7 +155,7 @@ The script publishes the app, downloads the official WebView2 bootstrapper, chec
 | Output | Default path |
 | --- | --- |
 | App and required files | `artifacts\webview2\` |
-| Installer | `artifacts\setup\CustomStereoMix-1.2.2-Setup-x64.exe` |
+| Installer | `artifacts\setup\CustomStereoMix-1.3.0-Setup-x64.exe` |
 
 The default version comes from `Directory.Build.props`. The installer's `-Version` argument overrides it for the app and installer.
 
@@ -209,7 +211,9 @@ Tests cover resampling continuity and filtering, surround downmixing, buffers, f
 
 Once the interface is ready, the app checks GitHub Releases in the background once per launch. It shows a popup only for a higher stable `vX.Y.Z` version with a ready Windows x64 installer. **Later** dismisses it; **Check for updates** in Settings can check again.
 
-**Download installer** opens the verified official asset link in your browser. Exit from the tray before running the downloaded installer. **Release notes** opens that release's page. No release, offline access, rate limits or server errors leave audio controls usable. Drafts and prereleases are excluded.
+**Download installer** downloads inside the app with progress and SHA-256 verification. After you confirm, the app stops audio routing, saves settings, exits, and launches the installer. You can relaunch on completion. A manually launched installer also offers to close a running app, including one in the tray. **Release notes** opens the release page.
+
+Start menu shortcuts and Windows sign-in startup are separate installer options. Startup can also be changed in Settings and is preserved during upgrades. Uninstall removes this app's Run and StartupApproved entries. Startup opens the app; audio routing starts manually. Guide and Settings open as popup panels with Esc/Close to return.
 
 ## Settings and diagnostics
 

@@ -2,6 +2,7 @@ import { t, setLanguage, type MessageKey } from "./i18n";
 import type { AppState, Settings, WebViewBridge } from "./types";
 const defaults: Settings = {
   language: "ko-KR",
+  startWithWindows: false,
   gainDb: 0,
   compressorEnabled: false,
   compressorThresholdDb: -12,
@@ -64,9 +65,13 @@ export function createPreviewBridge(): WebViewBridge {
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
     trayHint: "TrayContinues",
-    appVersion: "v1.2.2",
+    appVersion: "v1.3.0",
     updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
+  isDownloadingUpdate: false,
+  updateDownloaded: false,
+  downloadMessage: "",
+  downloadProgress: null,
     latestVersion: null,
     hasUpdateInstaller: false,
     hasReleasePage: false,

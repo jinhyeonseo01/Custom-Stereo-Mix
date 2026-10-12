@@ -18,7 +18,7 @@ function gh {
     if ($arguments[0] -ne 'api') { throw 'Tag-resolving release CLI command was used.' }
     $methodIndex = [Array]::IndexOf($arguments, '--method')
     $method = if ($methodIndex -ge 0) { $arguments[$methodIndex + 1] } else { 'GET' }
-    $endpoint = if ($methodIndex -ge 0) { $arguments[$methodIndex + 2] } elseif ($arguments -contains '--slurp') { $arguments[-1] } else { $arguments[1] }
+    $endpoint = if ($methodIndex -ge 0) { $arguments[$methodIndex + 2] } elseif ($arguments -contains '--include') { $arguments[-1] } else { $arguments[1] }
     $release = @{ id = 123; draft = ($mock.Mode -ne 'published'); prerelease = ($mock.Mode -eq 'prerelease'); tag_name = 'v1.2.3'; assets = @() }
     if ($mock.Mode -eq 'invalid-id') { $release.id = '../invalid' }
     if ($mock.Mode -in @('replace', 'replace-failed')) { $release.assets = @(@{ id = 456; name = 'CustomStereoMix-1.2.3-Setup-x64.exe' }) }
@@ -28,18 +28,14 @@ function gh {
     }
     if ($method -eq 'GET' -and $endpoint -eq 'repos/example/stereomix/releases/123') { return ($release | ConvertTo-Json -Depth 5 -Compress) }
     if ($method -eq 'GET') {
-        if ($endpoint -match '/releases/tags/') { throw 'Published-only lookup used for a draft.' }
-        if ($arguments -notcontains '--paginate' -or $arguments -notcontains '--slurp') { throw 'Release pagination is missing.' }
+        if ($endpoint -notmatch '/releases/tags/' -or $arguments -notcontains '--include' -or $arguments -notcontains '--silent') { throw 'Unexpected release lookup.' }
         $mock.Lookups++
-        if ($mock.Mode -eq 'lookup-failed') { $global:LASTEXITCODE = 1; return }
-        if ($mock.Mode -in @('new', 'new-invisible', 'create-failed', 'missing-tag', 'created-invalid')) {
-            if ($mock.Lookups -gt 1) { throw 'Created draft was looked up again instead of using the POST response.' }
-            return '[[]]'
-        }
-        $json = $release | ConvertTo-Json -Depth 5 -Compress
-        if ($mock.Mode -eq 'paginated') { return ('[[{"id":1,"tag_name":"v1.0.0","draft":false}],[' + $json + ']]') }
-        if ($mock.Mode -eq 'duplicates') { return ('[[' + $json + ',' + $json + ']]') }
-        return ('[[' + $json + ']]')
+        if ($mock.Lookups -gt 1) { throw 'Created draft was looked up again.' }
+        if ($mock.Mode -eq 'published') { return 'HTTP/2.0 200 OK' }
+        $global:LASTEXITCODE = 1
+        if ($mock.Mode -eq 'lookup-failed') { return 'HTTP/2.0 403 Forbidden' }
+        if ($mock.Mode -eq 'lookup-error') { return 'HTTP/2.0 500 Internal Server Error' }
+        return 'HTTP/2.0 404 Not Found'
     }
     if ($method -eq 'DELETE') {
         if ($endpoint -ne 'repos/example/stereomix/releases/assets/456') { throw 'Wrong asset deletion ID.' }
@@ -71,25 +67,25 @@ function gh {
 }
 
 try {
-    foreach ($mode in @('new', 'new-invisible', 'draft', 'paginated', 'explicit-id', 'replace', 'published', 'prerelease', 'duplicates', 'lookup-failed', 'create-failed', 'created-invalid', 'invalid-id', 'missing-tag', 'upload-failed', 'asset-corrupt', 'hash-corrupt', 'replace-failed', 'publish-failed')) {
+    foreach ($mode in @('new', 'new-invisible', 'explicit-id', 'replace', 'published', 'prerelease', 'lookup-failed', 'lookup-error', 'create-failed', 'created-invalid', 'invalid-id', 'missing-tag', 'upload-failed', 'asset-corrupt', 'hash-corrupt', 'replace-failed', 'publish-failed')) {
         $mock = @{ Mode = $mode; Lookups = 0; Calls = [Collections.Generic.List[string]]::new() }
         $global:stereomixPublisherMock = $mock
         $parameters = @{ Tag = 'v1.2.3'; Repository = 'example/stereomix'; SetupDirectory = $fixture }
-        if ($mode -eq 'explicit-id') { $parameters.ReleaseId = 123 }
+        if ($mode -in @('explicit-id', 'replace', 'replace-failed', 'prerelease', 'invalid-id')) { $parameters.ReleaseId = 123 }
         $failed = $false
         try { & $publisher @parameters | Out-Null }
         catch { $failed = $true }
-        $successExpected = $mode -in @('new', 'new-invisible', 'draft', 'paginated', 'explicit-id', 'replace')
+        $successExpected = $mode -in @('new', 'new-invisible', 'explicit-id', 'replace')
         if ($successExpected -eq $failed) { throw "Unexpected result: $mode" }
         $creates = @($mock.Calls | Where-Object { $_ -match '^api --method POST repos/example/stereomix/releases ' })
         $uploads = @($mock.Calls | Where-Object { $_ -match '^api --method POST https://uploads.github.com/' })
         $publishes = @($mock.Calls | Where-Object { $_ -match '^api --method PATCH' })
         if ($successExpected -and ($uploads.Count -ne 2 -or $publishes.Count -ne 1)) { throw "Incomplete publication: $mode" }
         if ($mode -in @('new', 'new-invisible') -and ($creates.Count -ne 1 -or $mock.Lookups -ne 1)) { throw 'Creation response was not reused.' }
-        if ($mode -in @('draft', 'paginated', 'lookup-failed', 'explicit-id') -and $creates.Count -ne 0) { throw "Unnecessary creation: $mode" }
+        if ($mode -in @('lookup-failed', 'explicit-id') -and $creates.Count -ne 0) { throw "Unnecessary creation: $mode" }
         if ($mode -eq 'explicit-id' -and $mock.Lookups -ne 0) { throw 'Explicit ID recovery used a list lookup.' }
         if (-not $successExpected -and $mode -ne 'publish-failed' -and $publishes.Count -ne 0) { throw "Unsafe publication: $mode" }
-        if ($mode -in @('published', 'prerelease', 'duplicates', 'lookup-failed', 'invalid-id', 'missing-tag', 'created-invalid') -and $uploads.Count -ne 0) { throw "Unsafe upload: $mode" }
+        if ($mode -in @('published', 'prerelease', 'lookup-failed', 'lookup-error', 'invalid-id', 'missing-tag', 'created-invalid') -and $uploads.Count -ne 0) { throw "Unsafe upload: $mode" }
         Write-Output "PASS release publishing: $mode"
     }
     Set-Content -LiteralPath "$installer.sha256" -Value 'invalid' -Encoding ascii

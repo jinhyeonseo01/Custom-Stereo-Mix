@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.2"
+  #define AppVersion "1.3.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\webview2"
@@ -29,8 +29,9 @@ Compression=lzma2
 SolidCompression=yes
 DisableProgramGroupPage=yes
 AllowNoIcons=yes
-CloseApplications=no
-AppMutex=Local\CustomStereoMix.WebView2
+CloseApplications=force
+CloseApplicationsFilter={#AppExe}
+RestartApplications=no
 ShowLanguageDialog=yes
 
 [Languages]
@@ -56,27 +57,90 @@ korean.LanguageSaveError=앱의 초기 언어 설정을 저장하지 못했습�
 english.LanguageSaveError=Could not save the app's initial language setting.
 japanese.LanguageSaveError=アプリの初期言語設定を保存できませんでした。
 chinesesimplified.LanguageSaveError=无法保存应用的初始语言设置。
+korean.StartMenuShortcut=시작 메뉴에 추가
+english.StartMenuShortcut=Add to the Start menu
+japanese.StartMenuShortcut=スタートメニューに追加
+chinesesimplified.StartMenuShortcut=添加到开始菜单
+korean.StartWithWindows=Windows 로그인 시 자동 실행
+english.StartWithWindows=Start automatically when signing in to Windows
+japanese.StartWithWindows=Windowsへのサインイン時に自動起動
+chinesesimplified.StartWithWindows=登录 Windows 时自动运行
+korean.StartupOptions=프로그램 시작:
+english.StartupOptions=Application startup:
+japanese.StartupOptions=アプリの起動:
+chinesesimplified.StartupOptions=应用启动：
 
 [UninstallDelete]
 Type: files; Name: "{app}\initial-language.json"
 
 [Tasks]
+Name: "startmenu"; Description: "{cm:StartMenuShortcut}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "autostart"; Description: "{cm:StartWithWindows}"; GroupDescription: "{cm:StartupOptions}"; Flags: unchecked
+
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CustomStereoMix"; ValueData: """{app}\{#AppExe}"" --autostart"; Tasks: autostart; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "CustomStereoMix"; Tasks: not autostart; Flags: deletevalue
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "dependencies\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: startmenu
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+
+[InstallDelete]
+Type: files; Name: "{group}\{#AppName}.lnk"; Tasks: not startmenu
+Type: files; Name: "{autodesktop}\{#AppName}.lnk"; Tasks: not desktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var StartupTaskAdjusted: Boolean;
+
+procedure ConfigureStartupTask;
+var Command: String; Data: AnsiString; Enabled: Boolean; Index: Integer;
+begin
+  for Index := 1 to ParamCount do
+    if (Pos('/TASKS=', Uppercase(ParamStr(Index))) = 1) or
+       (Pos('/MERGETASKS=', Uppercase(ParamStr(Index))) = 1) then Exit;
+  // Read the current registry choice on upgrades, including changes made in the app.
+  if FileExists(AddBackslash(WizardDirValue) + '{#AppExe}') then begin
+    Enabled := RegQueryStringValue(HKCU64, 'Software\Microsoft\Windows\CurrentVersion\Run', 'CustomStereoMix', Command) and
+      (CompareText(Command, '"' + AddBackslash(WizardDirValue) + '{#AppExe}" --autostart') = 0);
+    if RegQueryBinaryValue(HKCU64, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', 'CustomStereoMix', Data) then
+      if Length(Data) > 0 then
+        if (Ord(Data[1]) = 3) or (Ord(Data[1]) = 7) then Enabled := False;
+    WizardSelectTasks('!autostart');
+    if Enabled then WizardSelectTasks('autostart');
+    Log('Startup default from current registration: ' + IntToStr(Ord(Enabled)));
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  // Tasks are initialized after InitializeWizard. Apply once after that stage,
+  // including wpReady on silent installs, without overwriting the user's edits.
+  if not StartupTaskAdjusted and ((CurPageID = wpSelectTasks) or (CurPageID = wpReady)) then begin
+    StartupTaskAdjusted := True;
+    ConfigureStartupTask;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then begin
+    RegDeleteValue(HKCU64, 'Software\Microsoft\Windows\CurrentVersion\Run', 'CustomStereoMix');
+    RegDeleteValue(HKCU64, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', 'CustomStereoMix');
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssPostInstall then
+    RegDeleteValue(HKCU64, 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run', 'CustomStereoMix');
   if CurStep = ssPostInstall then
     if not SaveStringToFile(ExpandConstant('{app}\initial-language.json'),
       '{"language":"' + ExpandConstant('{cm:AppLanguage}') + '"}', False) then

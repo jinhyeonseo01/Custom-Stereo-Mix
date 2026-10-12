@@ -21,7 +21,7 @@
     "StartRouting": "开始音频连接",
     "InstallerLinkFailed": "无法打开安装程序链接。请在设置中重试。",
     "UpdateAvailableTitle": "有可用更新",
-    "UpdateInstallHint": "可以下载新版 Windows 安装程序。下载后，请从托盘退出应用，再运行安装程序。",
+    "UpdateInstallHint": "应用将下载安装程序并验证，然后在安装前确认停止音频传输并关闭应用。",
     "ReleaseNotes": "查看更新内容",
     "Later": "稍后",
     "Opening": "正在打开…",
@@ -165,6 +165,19 @@
     "NoRoute": "尚未选择连接路径",
     "NoCableTarget": "尚未选择虚拟音频线目标。",
     "Detail": "{0}",
-    "Empty": ""
+    "Empty": "",
+    "StartWithWindows": "登录 Windows 时自动运行",
+    "StartupHint": "登录时打开应用。启用托盘时在托盘中启动；音频传输需手动启动。",
+    "EngineBufferHint": "缓冲区表示最大容量，并非 250 ms 的播放等待时间。降低延迟可能增加音频中断。",
+    "UpdateDownloading": "正在下载安装程序…",
+    "UpdateVerifying": "正在验证下载文件…",
+    "UpdateReadyToInstall": "验证完成，可以开始安装。",
+    "UpdateChecksumFailed": "文件验证失败，请重新下载。",
+    "UpdateDownloadFailed": "安装程序下载不完整。",
+    "UpdateDownloadCancelled": "已取消下载。",
+    "UpdateDownloadError": "下载失败：{0}",
+    "UpdateExitConfirmation": "安装程序已下载并验证。是否停止音频传输、关闭应用并安装更新？",
+    "UpdateLaunchFailed": "无法开始安装。请确认应用已退出后重试。{0}",
+    "InstallUpdate": "安装更新"
   }
 }
