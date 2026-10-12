@@ -15,17 +15,35 @@ if (-not (Test-Path -LiteralPath $installerPath) -or -not (Test-Path -LiteralPat
 $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ((Get-Content -LiteralPath $checksumPath -Raw).Trim() -cne "$installerHash  $installerName") { throw 'Installer checksum mismatch.' }
 
-$releaseJson = gh api "repos/$Repository/releases/tags/$Tag"
-if ($LASTEXITCODE -ne 0) {
+function Find-TaggedRelease {
+    # /releases/tags/{tag} only returns published releases. Authenticated list
+    # requests include drafts, and --slurp keeps paginated JSON parseable.
+    $releaseJson = gh api --paginate --slurp "repos/$Repository/releases?per_page=100"
+    if ($LASTEXITCODE -ne 0) { throw 'Release lookup failed; no draft was created.' }
+    $pages = ($releaseJson -join "`n") | ConvertFrom-Json -NoEnumerate
+    $matches = @(
+        foreach ($page in $pages) {
+            foreach ($entry in $page) {
+                if ($entry.tag_name -ceq $Tag) { $entry }
+            }
+        }
+    )
+    if ($matches.Count -gt 1) { throw 'Multiple releases match the tag. Resolve the duplicate drafts before retrying.' }
+    if ($matches.Count -eq 1) { return $matches[0] }
+    return $null
+}
+
+$release = Find-TaggedRelease
+if ($null -eq $release) {
     gh release create $Tag --repo $Repository --draft --verify-tag --generate-notes --title $Tag
     if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
-    $releaseJson = gh api "repos/$Repository/releases/tags/$Tag"
-    if ($LASTEXITCODE -ne 0) { throw 'Draft release lookup failed.' }
+    $release = Find-TaggedRelease
+    if ($null -eq $release) { throw 'Created draft could not be found. The draft was kept for retry.' }
 }
-$release = $releaseJson | ConvertFrom-Json
 if (-not $release.draft -or $release.prerelease -or $release.tag_name -cne $Tag) {
     throw 'The tag already has a published or non-matching release. Use a new version tag.'
 }
+if ($release.id -isnot [long] -and $release.id -isnot [int]) { throw 'Release ID is invalid.' }
 # Upload completely before publication so the updater cannot see a partial release.
 gh release upload $Tag $installerPath $checksumPath --repo $Repository --clobber
 if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed; the draft was kept for retry.' }
