@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CustomStereoMix.Core;
 
 namespace CustomStereoMix.State;
 
@@ -30,7 +31,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
     public JsonElement Snapshot() => JsonSerializer.SerializeToElement(new
     {
         revision = Interlocked.Increment(ref _revision), view = _view, guideDraft = _guideDraft,
-        sources = model.Sources, targets = model.Targets, microphones = model.Microphones,
+        sources = model.Sources.Select(Device), targets = model.Targets.Select(Device), microphones = model.Microphones.Select(Device),
         sourceDeviceId = model.SelectedSource?.Id, targetDeviceId = model.SelectedTarget?.Id,
         microphoneDeviceId = model.SelectedMicrophone?.Id,
         model.StatusText, model.TargetMessage, model.NoticeText, model.IsRouting,
@@ -44,12 +45,17 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         updating = model.IsCheckingUpdates,
         settings = new
         {
-            model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
+            model.Language, model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
             model.IsMicMixEnabled, model.MicGainDb, model.SampleRate, model.Channels,
             model.LatencyMilliseconds, model.BufferMilliseconds, model.MinimizeToTray
         }
     }, JsonOptions);
 
+    private object Device(Core.AudioDeviceDescriptor device) => new
+    {
+        device.Id, device.Name, device.IsDefault, device.IsVirtualCableCandidate,
+        summary = model.Text(MessageKey.DeviceSummary, device.SampleRate / 1000.0, device.Channels, device.IsDefault ? model.Text(MessageKey.DefaultDevice) : "")
+    };
     public object Meter() => new { model.LevelPercent, model.SignalState, samples = model.Waveform };
 
     public async Task<object> HandleAsync(JsonElement message)
@@ -59,7 +65,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         try
         {
             id = message.GetProperty("id").GetString();
-            if (string.IsNullOrWhiteSpace(id) || id.Length > 80) throw new InvalidOperationException("요청 ID가 올바르지 않습니다.");
+            if (string.IsNullOrWhiteSpace(id) || id.Length > 80) throw new InvalidOperationException().WithMessage(MessageKey.InvalidRequestId);
             var command = message.GetProperty("command").GetString();
             var payload = message.TryGetProperty("payload", out var p) ? p : default;
             switch (command)
@@ -77,7 +83,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "refresh": await RunCommand(model.RefreshDevicesCommand); break;
                 case "reset": await RunCommand(model.ResetSettingsCommand); break;
                 case "checkUpdates":
-                    if (!model.CheckUpdatesCommand.CanExecute(null)) throw new InvalidOperationException("업데이트 확인을 잠시 기다려 주세요.");
+                    if (!model.CheckUpdatesCommand.CanExecute(null)) throw new InvalidOperationException().WithMessage(MessageKey.WaitUpdate);
                     // Network I/O must not hold the command gate used by Start/Stop.
                     _ = model.CheckUpdatesCommand.ExecuteAsync(null);
                     break;
@@ -90,17 +96,17 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "closeView": OpenView("main"); break;
                 case "guideDraft": _guideDraft = payload.GetProperty("dontShowAgain").GetBoolean(); break;
                 case "openCableWebsite":
-                    if (openCableWebsite is null) throw new InvalidOperationException("설치 페이지를 열 수 없습니다.");
+                    if (openCableWebsite is null) throw new InvalidOperationException().WithMessage(MessageKey.CannotOpenInstallPage);
                     await openCableWebsite();
                     break;
-                default: throw new InvalidOperationException("지원하지 않는 요청입니다.");
+                default: throw new InvalidOperationException().WithMessage(MessageKey.UnsupportedRequest);
             }
             Changed?.Invoke(this, EventArgs.Empty);
             return new { type = "response", id, ok = true, state = Snapshot() };
         }
         catch (Exception ex)
         {
-            return new { type = "response", id, ok = false, error = ex.Message, state = Snapshot() };
+            return new { type = "response", id, ok = false, error = model.Describe(ex), state = Snapshot() };
         }
         finally { _commands.Release(); }
     }
@@ -109,19 +115,19 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
     {
         var url = installer ? model.UpdateResult?.InstallerUrl : model.UpdateResult?.ReleasePage;
         if (url is null || openUpdateWebsite is null || !GitHubReleaseUpdateService.IsReleaseLink(url))
-            throw new InvalidOperationException("업데이트 링크를 열 수 없습니다.");
+            throw new InvalidOperationException().WithMessage(MessageKey.CannotOpenUpdateLink);
         await openUpdateWebsite(url);
     }
 
     private static async Task RunCommand(CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command)
     {
-        if (!command.CanExecute(null)) throw new InvalidOperationException("현재 상태에서는 이 동작을 실행할 수 없습니다.");
+        if (!command.CanExecute(null)) throw new InvalidOperationException().WithMessage(MessageKey.ActionUnavailable);
         await command.ExecuteAsync(null);
     }
 
     private void ApplyPatch(JsonElement payload)
     {
-        if (!model.CanEditSettings) throw new InvalidOperationException("설정 변경을 잠시 기다려 주세요.");
+        if (!model.CanEditSettings) throw new InvalidOperationException().WithMessage(MessageKey.WaitSettings);
         var actions = new List<Action>();
         foreach (var field in payload.EnumerateObject())
         {
@@ -129,10 +135,17 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
             var value = field.Value;
             if (name is "sourceDeviceId" or "targetDeviceId" or "microphoneDeviceId" or "isMicMixEnabled" or
                 "sampleRate" or "channels" or "latencyMilliseconds" or "bufferMilliseconds")
-                if (!model.CanEditRoute) throw new InvalidOperationException("소리 연결을 중지한 뒤 변경해 주세요.");
+                if (!model.CanEditRoute) throw new InvalidOperationException().WithMessage(MessageKey.StopBeforeChange);
             // Validate the complete patch before applying any part of it.
             switch (name)
             {
+                case "language":
+                {
+                    var language = value.GetString();
+                    if (!Core.LanguageCatalog.IsSupported(language)) throw new InvalidOperationException().WithMessage(MessageKey.UnsupportedLanguage);
+                    actions.Add(() => model.Language = language!);
+                    break;
+                }
                 case "gainDb": { var n = Number(value, -12, 12); actions.Add(() => model.GainDb = n); break; }
                 case "micGainDb": { var n = Number(value, -12, 12); actions.Add(() => model.MicGainDb = n); break; }
                 case "compressorThresholdDb": { var n = Number(value, -40, -3); actions.Add(() => model.CompressorThresholdDb = n); break; }
@@ -147,7 +160,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "sourceDeviceId": { var d = FindDevice(model.Sources, value); actions.Add(() => model.SelectedSource = d); break; }
                 case "targetDeviceId": { var d = FindDevice(model.Targets, value); actions.Add(() => model.SelectedTarget = d); break; }
                 case "microphoneDeviceId": { var d = FindDevice(model.Microphones, value); actions.Add(() => model.SelectedMicrophone = d); break; }
-                default: throw new InvalidOperationException($"변경할 수 없는 설정: {name}");
+                default: throw new InvalidOperationException().WithMessage(MessageKey.CannotChangeSetting, name);
             }
         }
         double Proposed(string key, double fallback) => payload.TryGetProperty(key, out var n) ? n.GetDouble() : fallback;
@@ -162,13 +175,13 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
 
     private static Core.AudioDeviceDescriptor FindDevice(IEnumerable<Core.AudioDeviceDescriptor> devices, JsonElement value) =>
         devices.FirstOrDefault(d => string.Equals(d.Id, value.GetString(), StringComparison.OrdinalIgnoreCase))
-        ?? throw new InvalidOperationException("선택한 장치를 찾을 수 없습니다. 장치를 새로고침해 주세요.");
+        ?? throw new InvalidOperationException().WithMessage(MessageKey.DeviceNotFound);
 
     private static double Number(JsonElement value, double min, double max, bool integer = false)
     {
         var n = value.GetDouble();
         if (!double.IsFinite(n) || n < min || n > max || (integer && n != Math.Truncate(n)))
-            throw new InvalidOperationException($"설정 범위를 확인해 주세요 ({min}–{max}).");
+            throw new InvalidOperationException().WithMessage(MessageKey.InvalidRange, min, max);
         return n;
     }
 }

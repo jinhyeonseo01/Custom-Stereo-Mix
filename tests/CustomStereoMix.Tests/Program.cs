@@ -5,6 +5,9 @@ using CustomStereoMix.State;
 
 var tests = new (string Name, Action Body)[]
 {
+    ("four language resources preserve keys, placeholders and dynamic errors", LocalizationTests.Resources),
+    ("installer language seed resolves with safe OS fallback", LocalizationTests.InstallerSeed),
+    ("language switches preserve routing and persist through restart and reset", LocalizationTests.PersistenceAndRouting),
     ("ring buffer fills underrun with silence", RingBufferUnderrun),
     ("ring buffer drops oldest samples on overflow", RingBufferOverflow),
     ("dsp limiter clamps output", DspLimiter),
@@ -200,7 +203,7 @@ static void FeedbackValidation()
     var source = Device("headphone"); var target = Device("cable", true); var mic = Device("mic");
     if (RouteValidator.GetError(source, source, null, false) is null) throw new Exception("Self-loop accepted.");
     if (RouteValidator.GetError(source, target, target, true) is null) throw new Exception("Cable microphone accepted.");
-    Equal<string?>(null, RouteValidator.GetError(source, target, mic, true));
+    Equal<MessageKey?>(null, RouteValidator.GetError(source, target, mic, true));
 }
 
 static void ViewModelPersistence()
@@ -316,7 +319,7 @@ static void UpdatePlaceholder()
     Equal<string?>(null, result.LatestVersion); Equal<Uri?>(null, result.ReleasePage);
     var vm = new MainWindowViewModel(new FakeDevices(), new FakeRouter(), new JsonSettingsStore(TemporarySettingsPath()));
     vm.CheckUpdatesCommand.ExecuteAsync(null).GetAwaiter().GetResult();
-    Equal(result.Message, vm.UpdateMessage);
+    Equal(vm.Text(result.Message.Key, result.Message.Arguments), vm.UpdateMessage);
 }
 
 static void FrameAlignedBuffer()
@@ -457,11 +460,11 @@ sealed class OrderedRouter : IAudioRouteController
     public event EventHandler<LevelMeterSnapshot>? LevelChanged { add { } remove { } }
     public Task StartAsync(RouteConfig config, CancellationToken cancellationToken = default)
     {
-        Calls.Add("start"); State = RouteState.Running; StatusChanged?.Invoke(this, new(State, "연결 중")); return Task.CompletedTask;
+        Calls.Add("start"); State = RouteState.Running; StatusChanged?.Invoke(this, new(State, new(MessageKey.Routing))); return Task.CompletedTask;
     }
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
-        Calls.Add("stop"); State = RouteState.Stopped; StatusChanged?.Invoke(this, new(State, "대기 중")); return Task.CompletedTask;
+        Calls.Add("stop"); State = RouteState.Stopped; StatusChanged?.Invoke(this, new(State, new(MessageKey.Ready))); return Task.CompletedTask;
     }
     public void UpdateProcessing(ProcessingSettings settings) { }
     public void UpdateMicrophoneMix(MicMixSettings settings) { }

@@ -4,6 +4,8 @@
 
 <h1 align="center">Custom Stereo Mix</h1>
 
+<p align="center">한국어 · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a></p>
+
 <p align="center">
   Windows용 커스텀 스테레오 믹스 — PC 재생음과 마이크를 Discord · OBS · 녹음 · STT 앱의 입력으로
 </p>
@@ -31,6 +33,7 @@
 - **트레이 실행** — 창을 닫거나 최소화해도 연결 유지, 트레이 메뉴에서 시작·중지·종료
 - **설정 자동 저장** — 장치 ID 저장, 정상 설정 백업, 손상된 설정 복구와 초기화
 - **내장 사용 안내** — 첫 실행 안내와 언제든 다시 열 수 있는 가상 케이블 설정 가이드
+- **다국어 지원** — 한국어, 영어, 일본어, 중국어 간체. 설치 언어를 초기 설정에 반영하며 설정에서 즉시 변경 가능
 
 > **사용 전 추가 조치:** 스테레오 믹스 기능을 사용하려면 출력을 입력으로 연결하는 **가상 오디오 케이블을 별도로 설치**해야 합니다. VB-CABLE, VAC 등 대응되는 재생·녹음 장치 쌍을 가진 제품을 사용할 수 있습니다.
 
@@ -66,7 +69,7 @@
 
 설치기는 [GitHub Releases](https://github.com/jinhyeonseo01/Custom-Stereo-Mix/releases)에서 받을 수 있습니다. 첫 릴리즈는 `vX.Y.Z` 태그를 푸시하면 생성됩니다. 직접 빌드하려면 아래 [빌드 안내](#build)를 참고하세요.
 
-- **설치기:** `artifacts\setup\CustomStereoMix-1.1.0-Setup-x64.exe`
+- **설치기:** `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe`
 - **폴더 배포:** `artifacts\webview2\CustomStereoMix.App.exe` 실행
 
 설치기는 사용자별 경로에 설치합니다. WebView2 Runtime 설치가 필요하면 인터넷 연결이 필요합니다. VB-CABLE의 드라이버 설치에는 별도로 관리자 권한이 필요합니다.
@@ -83,6 +86,9 @@
 | 시스템 트레이 사용 | 기본 활성화입니다. 닫기·최소화는 트레이로 숨기고 오디오 연결을 유지합니다. 트레이의 **종료**는 실제 종료합니다. 기능을 끄면 닫기도 실제 종료합니다. |
 | 설정 초기화 | 확인 후 연결을 중지하고 모든 설정을 기본값으로 복원합니다. 취소하면 기존 상태를 유지합니다. |
 | 업데이트 확인 | 설정 최상단에 있습니다. GitHub의 최신 정식 릴리즈를 확인합니다. 새 버전의 설치기가 있으면 알림을 표시하고 다운로드 또는 변경 사항 페이지를 열 수 있습니다. |
+| 표시 언어 | 설정 → 프로그램 동작에서 변경합니다. 화면·트레이·안내에 즉시 반영되며 오디오 연결은 유지됩니다. |
+
+설치 시작 시 언어를 선택할 수 있습니다. 앱은 **저장한 언어 → 설치 시 선택한 언어 → Windows 표시 언어 → 영어** 순서로 적용합니다. 기존 설정에서 직접 선택한 언어는 재설치해도 유지합니다. 초기화하면 설치 시 선택한 언어로 돌아가며, 폴더 배포에서는 Windows 표시 언어를 기본값으로 사용합니다.
 
 <details>
 <summary>설정 화면 보기</summary>
@@ -115,7 +121,7 @@
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | 모든 C# 빌드. `global.json` 기준 10.0.301 및 호환되는 최신 10.0 SDK를 사용합니다. |
 | [Node.js / npm](https://nodejs.org/en/download/) | React UI와 아이콘 빌드. Node.js 24를 권장합니다. |
 | [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) | 개발 중 데스크톱 앱 실행 |
-| [Inno Setup](https://jrsoftware.org/isdl.php) | 설치기 생성. Inno Setup 7을 권장합니다. |
+| [Inno Setup 7](https://jrsoftware.org/isdl.php) | 네 언어를 제공하는 설치기 생성. |
 
 첫 빌드에서 NuGet 및 npm 패키지를 복원하므로 인터넷 연결이 필요합니다. 삭제한 빌드 캐시와 의존성은 필요한 경우 자동으로 다시 생성됩니다.
 
@@ -175,7 +181,7 @@ Inno Setup이 기본 경로에 설치되어 있거나 `ISCC.exe`가 PATH에 있�
 | 산출물 | 기본 경로 |
 | --- | --- |
 | 앱 실행 파일 및 필수 파일 | `artifacts\webview2\` |
-| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.1.0-Setup-x64.exe` |
+| Windows x64 설치기 | `artifacts\setup\CustomStereoMix-1.2.0-Setup-x64.exe` |
 
 기본 버전은 `Directory.Build.props`에서 관리합니다. 설치기 스크립트의 `-Version`으로도 지정할 수 있으며 파일 이름에 해당 버전이 반영됩니다.
 
@@ -260,6 +266,8 @@ dotnet run --project tests\CustomStereoMix.Tests\CustomStereoMix.Tests.csproj -c
 | Inno Setup | Windows x64 사용자별 설치기 |
 
 실제 PCM은 C#에서 처리합니다. UI 브리지는 명령·상태·미터만 전달하므로 화면을 새로 고치거나 트레이로 숨겨도 오디오 연결을 유지합니다. 모듈별 역할과 메시지 흐름은 [프로젝트 구조](docs/PROJECT_STRUCTURE.md)를 참고하세요.
+
+번역은 C#·React가 공유하는 고정 메시지 키와 매개변수를 사용합니다. 리소스 파일을 추가하면 새 앱 언어가 등록되며, 설치기 언어는 별도로 추가합니다. 확장 방법은 [다국어 구조 안내](docs/LOCALIZATION.md)에 있습니다. Windows가 제공하는 장치 이름은 원문을 유지합니다.
 
 ## 문제 제보와 기여
 

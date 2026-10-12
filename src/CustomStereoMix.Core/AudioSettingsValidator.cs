@@ -11,6 +11,6 @@ public static class AudioSettingsValidator
             !float.IsFinite(processing.CompressorThresholdDb) || processing.CompressorThresholdDb is < -40 or > -3 ||
             !float.IsFinite(processing.CompressorRatio) || processing.CompressorRatio is < 1 or > 10 ||
             !float.IsFinite(mic.GainDb) || mic.GainDb is < -12 or > 12)
-            throw new InvalidDataException("오디오 설정 범위를 확인해 주세요. 버퍼 용량은 지연 값 이상이어야 합니다.");
+            throw new InvalidDataException().WithMessage(MessageKey.AudioRangeInvalid);
     }
 }

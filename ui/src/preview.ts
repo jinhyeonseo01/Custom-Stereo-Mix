@@ -1,5 +1,7 @@
+import { t, setLanguage, type MessageKey } from "./i18n";
 import type { AppState, Settings, WebViewBridge } from "./types";
 const defaults: Settings = {
+  language: "ko-KR",
   gainDb: 0,
   compressorEnabled: false,
   compressorThresholdDb: -12,
@@ -24,7 +26,7 @@ export function createPreviewBridge(): WebViewBridge {
         id: "headphone",
         name: stress
           ? "아주 긴 이름의 헤드폰 (SteelSeries Arctis Nova 5 Wireless 고해상도 오디오 장치)"
-          : "헤드폰 (SteelSeries Arctis Nova 5)",
+          : "Headphones (SteelSeries Arctis Nova 5)",
         summary: "48 kHz · 2채널 · 기본",
         isDefault: true,
         isVirtualCableCandidate: false,
@@ -42,7 +44,7 @@ export function createPreviewBridge(): WebViewBridge {
     microphones: [
       {
         id: "mic",
-        name: "마이크 (USB Microphone)",
+        name: "Microphone (USB Microphone)",
         summary: "48 kHz · 1채널",
         isDefault: true,
         isVirtualCableCandidate: false,
@@ -51,8 +53,8 @@ export function createPreviewBridge(): WebViewBridge {
     sourceDeviceId: "headphone",
     targetDeviceId: "cable",
     microphoneDeviceId: "mic",
-    statusText: "대기 중",
-    targetMessage: "녹음 앱에서는 이 케이블의 녹음 장치를 선택하세요.",
+    statusText: "Ready",
+    targetMessage: "CableInputHint",
     noticeText: "",
     isRouting: false,
     canEditRoute: true,
@@ -61,9 +63,9 @@ export function createPreviewBridge(): WebViewBridge {
     isStopEnabled: false,
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
-    trayHint: "닫기 · 최소화하면 트레이에서 계속 실행됩니다",
-    appVersion: "v1.1.0",
-    updateMessage: "업데이트 배포 준비 중입니다.",
+    trayHint: "TrayContinues",
+    appVersion: "v1.2.0",
+    updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
     latestVersion: null,
     hasUpdateInstaller: false,
@@ -81,7 +83,7 @@ export function createPreviewBridge(): WebViewBridge {
         type: "meter",
         meter: {
           levelPercent: state.isRouting ? 18 : 0,
-          signalState: state.isRouting ? "신호 감지됨" : "신호 없음",
+          signalState: t(state.isRouting ? "SignalDetected" : "NoSignal"),
           samples: state.isRouting
             ? Array.from(
                 { length: 96 },
@@ -121,14 +123,14 @@ export function createPreviewBridge(): WebViewBridge {
           state.canEditRoute = false;
           state.isStartEnabled = false;
           state.isStopEnabled = true;
-          state.statusText = "연결 중";
+          state.statusText = "Routing";
           break;
         case "stop":
           state.isRouting = false;
           state.canEditRoute = true;
           state.isStartEnabled = true;
           state.isStopEnabled = false;
-          state.statusText = "대기 중";
+          state.statusText = "Ready";
           break;
         case "patch": {
           Object.assign(state.settings, payload);
@@ -138,10 +140,10 @@ export function createPreviewBridge(): WebViewBridge {
             "microphoneDeviceId",
           ] as const)
             if (key in payload) state[key] = String(payload[key]);
-          state.engineLine = `${state.settings.sampleRate / 1000} kHz · ${state.settings.channels === 1 ? "모노" : "스테레오"}`;
+          state.engineLine = `${state.settings.sampleRate / 1000} kHz · ${state.settings.channels === 1 ? "Mono" : "Stereo"}`;
           state.trayHint = state.settings.minimizeToTray
-            ? "닫기 · 최소화하면 트레이에서 계속 실행됩니다"
-            : "닫으면 프로그램이 종료됩니다";
+            ? "TrayContinues"
+            : "CloseExits";
           break;
         }
         case "reset":
@@ -149,27 +151,55 @@ export function createPreviewBridge(): WebViewBridge {
           state.isRouting = false;
           state.canEditRoute = state.isStartEnabled = true;
           state.isStopEnabled = false;
-          state.statusText = "대기 중";
-          state.settingsMessage =
-            "설정을 기본값으로 초기화했습니다. 소리 연결은 중지되었습니다.";
+          state.statusText = "Ready";
+          state.settingsMessage = "SettingsResetDone";
           break;
         case "checkUpdates":
-          state.updateMessage =
-            "브라우저 미리보기에서는 실제 업데이트 서버에 연결하지 않습니다.";
+          state.updateMessage = "PreviewBanner";
           break;
         case "dismissUpdate":
           state.isUpdateDialogOpen = false;
           break;
         case "openRelease":
         case "downloadUpdate":
-          state.noticeText = "미리보기에서는 외부 페이지를 열지 않습니다.";
+          state.noticeText = "PreviewBanner";
           break;
         case "openCableWebsite":
-          state.noticeText = "미리보기에서는 외부 페이지를 열지 않습니다.";
+          state.noticeText = "PreviewBanner";
           break;
       }
       state.revision++;
+      setLanguage(state.settings.language);
       const snapshot = structuredClone(state);
+      snapshot.statusText = t(state.statusText as MessageKey);
+      snapshot.targetMessage = t("CableInputHint");
+      snapshot.noticeText = state.noticeText
+        ? t(state.noticeText as MessageKey)
+        : "";
+      snapshot.updateMessage = t(state.updateMessage as MessageKey);
+      snapshot.settingsMessage = state.settingsMessage
+        ? t(state.settingsMessage as MessageKey)
+        : "";
+      snapshot.engineLine = t(
+        "EngineSummary",
+        state.settings.sampleRate / 1000,
+        t(state.settings.channels === 1 ? "Mono" : "Stereo"),
+      );
+      snapshot.trayHint = t(
+        state.settings.minimizeToTray ? "TrayContinues" : "CloseExits",
+      );
+      for (const devices of [
+        snapshot.sources,
+        snapshot.targets,
+        snapshot.microphones,
+      ])
+        for (const device of devices)
+          device.summary = t(
+            "DeviceSummary",
+            48,
+            device.id === "mic" ? 1 : 2,
+            device.isDefault ? t("DefaultDevice") : "",
+          );
       setTimeout(
         () => emit({ type: "response", id, ok: true, state: snapshot }),
         30,

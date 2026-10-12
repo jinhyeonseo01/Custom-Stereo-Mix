@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
 using CustomStereoMix.State;
+using CustomStereoMix.Core;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Forms = System.Windows.Forms;
@@ -29,20 +30,29 @@ public partial class MainWindow : Window
         InitializeComponent();
         SourceInitialized += (_, _) => FitInitialWindow();
         _model = model;
+        StartupMessage.Text = model.Text(MessageKey.PreparingInterface);
+        RetryButton.Content = model.Text(MessageKey.Retry);
+        RuntimeButton.Content = model.Text(MessageKey.RuntimeGuide);
         _browserData = browserData ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CustomStereoMix", "WebView2");
         _bridge = new UiBridge(model, () => OpenWebsiteAsync("https://vb-audio.com/Cable/"), uri => OpenWebsiteAsync(uri.AbsoluteUri));
         var menu = new Forms.ContextMenuStrip { Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular) };
-        menu.Items.Add("창 열기", null, (_, _) => RestoreWindow());
-        menu.Items.Add("사용법", null, (_, _) => OpenView("help"));
-        menu.Items.Add("설정", null, (_, _) => OpenView("settings"));
+        Forms.ToolStripMenuItem MenuItem(MessageKey key, EventHandler? click = null)
+        {
+            var item = new Forms.ToolStripMenuItem(model.Text(key)) { Tag = key };
+            if (click is not null) item.Click += click;
+            return item;
+        }
+        menu.Items.Add(MenuItem(MessageKey.OpenWindow, (_, _) => RestoreWindow()));
+        menu.Items.Add(MenuItem(MessageKey.Guide, (_, _) => OpenView("help")));
+        menu.Items.Add(MenuItem(MessageKey.Settings, (_, _) => OpenView("settings")));
         menu.Items.Add(new Forms.ToolStripSeparator());
-        _startItem = new Forms.ToolStripMenuItem("소리 연결 시작");
-        _stopItem = new Forms.ToolStripMenuItem("소리 연결 중지");
+        _startItem = MenuItem(MessageKey.StartRouting);
+        _stopItem = MenuItem(MessageKey.TrayStopRouting);
         _startItem.Click += async (_, _) => await RunTrayCommand("start");
         _stopItem.Click += async (_, _) => await RunTrayCommand("stop");
         menu.Items.Add(_startItem); menu.Items.Add(_stopItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("종료", null, async (_, _) => await ExitAsync());
+        menu.Items.Add(MenuItem(MessageKey.Exit, async (_, _) => await ExitAsync()));
         using var stream = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/CustomStereoMix.App;component/Assets/AppIcon.ico"))!.Stream;
         _tray = new Forms.NotifyIcon { Icon = new System.Drawing.Icon(stream), ContextMenuStrip = menu, Text = "Custom Stereo Mix", Visible = model.MinimizeToTray };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) RestoreWindow(); };
@@ -86,7 +96,7 @@ public partial class MainWindow : Window
         Browser.Visibility = Visibility.Hidden;
         StartupPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = RuntimeButton.Visibility = Visibility.Collapsed;
-        StartupMessage.Text = "화면을 준비하고 있습니다…";
+        StartupMessage.Text = _model.Text(MessageKey.PreparingInterface);
         try
         {
             if (!_modelInitialized)
@@ -94,9 +104,10 @@ public partial class MainWindow : Window
                 await _model.InitializeAsync();
                 _modelInitialized = true;
                 UpdateTray();
+                StartupMessage.Text = _model.Text(MessageKey.PreparingInterface);
             }
             var content = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-            if (!File.Exists(Path.Combine(content, "index.html"))) throw new FileNotFoundException("화면 파일이 없습니다. 배포 폴더 전체에서 실행해 주세요.");
+            if (!File.Exists(Path.Combine(content, "index.html"))) throw new FileNotFoundException(_model.Text(MessageKey.InterfaceFilesMissing));
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _browserData);
             await Browser.EnsureCoreWebView2Async(environment);
             var core = Browser.CoreWebView2;
@@ -113,13 +124,14 @@ public partial class MainWindow : Window
             core.ProcessFailed += OnProcessFailed;
             core.NewWindowRequested += (_, e) => e.Handled = true;
             core.PermissionRequested += (_, e) => e.State = CoreWebView2PermissionState.Deny;
+            await core.AddScriptToExecuteOnDocumentCreatedAsync($"window.__initialLanguage = {JsonSerializer.Serialize(_model.Language)};");
             core.Navigate($"https://{AppHost}/index.html");
         }
         catch (Exception ex)
         {
             StartupMessage.Text = ex is WebView2RuntimeNotFoundException
-                ? "WebView2 Runtime이 필요합니다. 설치 안내 페이지에서 설치한 뒤 다시 시도해 주세요."
-                : $"화면을 열지 못했습니다.\n{ex.Message}";
+                ? _model.Text(MessageKey.RuntimeRequired)
+                : _model.Text(MessageKey.InterfaceOpenFailed, ex);
             RetryButton.Visibility = Visibility.Visible;
             RuntimeButton.Visibility = ex is WebView2RuntimeNotFoundException ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -163,7 +175,7 @@ public partial class MainWindow : Window
     {
         _pageReady = false;
         Browser.Visibility = Visibility.Hidden;
-        StartupMessage.Text = "화면이 종료되었습니다. 오디오 연결은 유지됩니다. 다시 시도하면 화면을 복구합니다.";
+        StartupMessage.Text = _model.Text(MessageKey.InterfaceStopped);
         StartupPanel.Visibility = RetryButton.Visibility = Visibility.Visible;
     }
 
@@ -218,6 +230,11 @@ public partial class MainWindow : Window
 
     private void UpdateTray()
     {
+        foreach (var item in _tray.ContextMenuStrip!.Items.OfType<Forms.ToolStripMenuItem>())
+            item.Text = _model.Text((MessageKey)item.Tag!);
+        RetryButton.Content = _model.Text(MessageKey.Retry);
+        RuntimeButton.Content = _model.Text(MessageKey.RuntimeGuide);
+        _meterDirty = true;
         _tray.Visible = _model.MinimizeToTray && !_shutdownComplete;
         _tray.Text = $"Custom Stereo Mix · {_model.StatusText}";
         _startItem.Enabled = _model.IsStartEnabled;

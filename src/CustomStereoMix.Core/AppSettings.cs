@@ -2,6 +2,7 @@ namespace CustomStereoMix.Core;
 
 public sealed record AppSettings
 {
+    public string? Language { get; init; }
     public string? SourceDeviceId { get; init; }
     public string? TargetDeviceId { get; init; }
     public string? MicrophoneDeviceId { get; init; }

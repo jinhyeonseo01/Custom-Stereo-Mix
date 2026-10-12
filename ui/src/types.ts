@@ -6,6 +6,7 @@ export interface Device {
   isVirtualCableCandidate: boolean;
 }
 export interface Settings {
+  language: string;
   gainDb: number;
   compressorEnabled: boolean;
   compressorThresholdDb: number;
@@ -86,5 +87,6 @@ declare global {
   interface Window {
     chrome?: { webview?: WebViewBridge };
     __stereoPreview?: boolean;
+    __initialLanguage?: string;
   }
 }

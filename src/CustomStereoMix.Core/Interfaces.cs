@@ -21,7 +21,7 @@ public interface IAudioRouteController
 
 public interface ISettingsStore
 {
-    string? LoadWarning => null;
+    LocalizedMessage? LoadWarning => null;
     Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default);
     Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default);
 }

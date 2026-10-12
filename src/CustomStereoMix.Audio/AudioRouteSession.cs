@@ -90,7 +90,7 @@ internal sealed class AudioRouteSession : IAsyncDisposable
                 try { resource?.Dispose(); }
                 catch (Exception ex) { errors.Add(ex); }
             }
-            if (errors.Count > 0) throw new AggregateException("오디오 장치 정리 중 오류가 발생했습니다.", errors);
+            if (errors.Count > 0) throw new AggregateException(errors).WithMessage(MessageKey.AudioCleanupFailed);
         }).ConfigureAwait(false);
     }
 

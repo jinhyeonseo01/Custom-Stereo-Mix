@@ -12,7 +12,7 @@ public sealed class JsonSettingsStore : ISettingsStore
 
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    public string? LoadWarning { get; private set; }
+    public LocalizedMessage? LoadWarning { get; private set; }
 
     public JsonSettingsStore(string? path = null)
     {
@@ -30,13 +30,13 @@ public sealed class JsonSettingsStore : ISettingsStore
             try { return await ReadAsync(_path, cancellationToken).ConfigureAwait(false); }
             catch (Exception ex) when (ex is JsonException or InvalidDataException or IOException or UnauthorizedAccessException)
             {
-                LoadWarning = "설정을 읽지 못해 기본값을 사용합니다. 장치 선택을 확인해 주세요.";
+                LoadWarning = new(MessageKey.SettingsLoadRecovery);
                 if (File.Exists(_path + ".bak"))
                 {
                     try
                     {
                         var backup = await ReadAsync(_path + ".bak", cancellationToken).ConfigureAwait(false);
-                        LoadWarning = "손상된 설정 대신 이전 저장본을 복구했습니다.";
+                        LoadWarning = new(MessageKey.SettingsBackupRecovery);
                         return backup;
                     }
                     catch (Exception backupError) when (backupError is JsonException or InvalidDataException or IOException or UnauthorizedAccessException) { }

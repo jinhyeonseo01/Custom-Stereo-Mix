@@ -35,8 +35,8 @@ public sealed class NaudioRouteController : IAudioRouteController
                 _devices.GetLoopbackSources().FirstOrDefault(d => d.Id == config.SourceDeviceId),
                 _devices.GetRenderTargets().FirstOrDefault(d => d.Id == config.TargetDeviceId),
                 _devices.GetMicrophones().FirstOrDefault(d => d.Id == config.MicrophoneDeviceId), config.Microphone.Enabled);
-            if (error is not null) throw new InvalidOperationException(error);
-            SetState(RouteState.Starting, "연결 시작 중");
+            if (error is not null) throw new InvalidOperationException().WithMessage(error.Value);
+            SetState(RouteState.Starting, new(MessageKey.StartingRouting));
             source = _devices.GetDevice(config.SourceDeviceId);
             target = _devices.GetDevice(config.TargetDeviceId);
             microphone = config.Microphone.Enabled && !string.IsNullOrWhiteSpace(config.MicrophoneDeviceId)
@@ -49,11 +49,11 @@ public sealed class NaudioRouteController : IAudioRouteController
             session.LevelChanged += (_, snapshot) => LevelChanged?.Invoke(this, snapshot);
             session.Faulted += async (_, exception) => await FaultAsync(session, exception).ConfigureAwait(false);
             await session.StartAsync(cancellationToken).ConfigureAwait(false);
-            SetState(RouteState.Running, "연결 중");
+            SetState(RouteState.Running, new(MessageKey.Routing));
         }
         catch (Exception ex)
         {
-            SetState(RouteState.Faulted, ex.Message);
+            SetState(RouteState.Faulted, new(MessageKey.Detail, ex));
             if (_session is not null)
             {
                 await DisposeSessionAsync().ConfigureAwait(false);
@@ -79,19 +79,19 @@ public sealed class NaudioRouteController : IAudioRouteController
         {
             if (_session is null)
             {
-                SetState(RouteState.Stopped, "대기 중");
+                SetState(RouteState.Stopped, new(MessageKey.Ready));
                 return;
             }
 
-            SetState(RouteState.Stopping, "연결 중지 중");
+            SetState(RouteState.Stopping, new(MessageKey.StoppingRouting));
             await DisposeSessionAsync().ConfigureAwait(false);
             LevelChanged?.Invoke(this, LevelMeterSnapshot.Silent);
-            SetState(RouteState.Stopped, "대기 중");
+            SetState(RouteState.Stopped, new(MessageKey.Ready));
         }
         catch (Exception ex)
         {
             LevelChanged?.Invoke(this, LevelMeterSnapshot.Silent);
-            SetState(RouteState.Faulted, ex.Message);
+            SetState(RouteState.Faulted, new(MessageKey.Detail, ex));
             throw;
         }
         finally
@@ -121,12 +121,12 @@ public sealed class NaudioRouteController : IAudioRouteController
             try { await DisposeSessionAsync().ConfigureAwait(false); }
             catch (Exception cleanupError) { exception = new AggregateException(exception, cleanupError); }
             LevelChanged?.Invoke(this, LevelMeterSnapshot.Silent);
-            SetState(RouteState.Faulted, exception.Message);
+            SetState(RouteState.Faulted, new(MessageKey.Detail, exception));
         }
         finally { _gate.Release(); }
     }
 
-    private void SetState(RouteState state, string message)
+    private void SetState(RouteState state, LocalizedMessage message)
     {
         State = state;
         StatusChanged?.Invoke(this, new RouteStatusSnapshot(state, message));

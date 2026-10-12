@@ -22,7 +22,13 @@ if (-not $IsccPath) {
     }
 }
 if (-not $IsccPath -or -not (Test-Path -LiteralPath $IsccPath)) {
-    throw 'Install Inno Setup 6/7 or pass -IsccPath with the full path to ISCC.exe.'
+    throw 'Install Inno Setup 7 or pass -IsccPath with the full path to ISCC.exe.'
+}
+$compilerFolder = Split-Path -Parent (Resolve-Path -LiteralPath $IsccPath).Path
+foreach ($translation in @('Korean.isl', 'Japanese.isl', 'ChineseSimplified.isl')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $compilerFolder "Languages\$translation"))) {
+        throw "The compiler is missing $translation. Install Inno Setup 7 with its language files."
+    }
 }
 $dependencyFolder = Join-Path $PSScriptRoot 'installer\dependencies'
 New-Item -ItemType Directory -Path $dependencyFolder -Force | Out-Null

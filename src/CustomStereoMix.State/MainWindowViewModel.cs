@@ -14,8 +14,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IUpdateService _updates;
     private readonly IUiDispatcher _dispatcher;
     private bool _resetting;
-    private string _settingsMessage = string.Empty;
-    private string _updateMessage = "GitHub Releases에서 새 버전을 확인할 수 있습니다.";
+    private LocalizedMessage _settingsMessage = LocalizedMessage.Empty;
+    private LocalizedMessage _updateMessage = new(MessageKey.UpdateIntro);
     private Task _updateTask = Task.CompletedTask;
     private CancellationTokenSource? _updateCancellation;
     private bool _startupUpdatesChecked;
@@ -26,17 +26,17 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool _shuttingDown;
     private bool _minimizeToTray = true;
     private bool? _hideUsageOnStartup;
-    private string _noticeText = string.Empty;
+    private LocalizedMessage _noticeText = LocalizedMessage.Empty;
     private AppSettings _loadedSettings = new();
     private CancellationTokenSource? _saveCancellation;
     private Task _pendingSave = Task.CompletedTask;
     private AudioDeviceDescriptor? _selectedSource;
     private AudioDeviceDescriptor? _selectedTarget;
     private AudioDeviceDescriptor? _selectedMicrophone;
-    private string _statusText = "대기 중";
-    private string _targetMessage = "No virtual cable target selected.";
-    private string _monitorCaption = "재생음을 기다리는 중";
-    private string _signalState = "신호 없음";
+    private LocalizedMessage _statusText = new(MessageKey.Ready);
+    private LocalizedMessage _targetMessage = new(MessageKey.NoCableTarget);
+    private LocalizedMessage _monitorCaption = new(MessageKey.WaitingPlayback);
+    private LocalizedMessage _signalState = new(MessageKey.NoSignal);
     private IReadOnlyList<float> _waveform = Array.Empty<float>();
     private double _levelPercent;
     private double _gainDb;
@@ -50,9 +50,32 @@ public sealed class MainWindowViewModel : ObservableObject
     private decimal _latencyMilliseconds = 50;
     private decimal _bufferMilliseconds = 250;
     private bool _isRouting;
+    private readonly string _initialLanguage;
+    private string _language;
+    private Localizer _localizer;
+    public string Text(MessageKey key, params object?[] args) => _localizer.Text(key, args);
+    public string Describe(Exception exception) => _localizer.Describe(exception);
 
-    public MainWindowViewModel(IAudioDeviceService devices, IAudioRouteController router, ISettingsStore settings, IUpdateService? updates = null, IUiDispatcher? dispatcher = null)
+    public string Language
     {
+        get => _language;
+        set
+        {
+            if (!LanguageCatalog.IsSupported(value)) throw new ArgumentException("Unsupported language.");
+            if (_language == value) return;
+            _language = value;
+            _localizer = new Localizer(value);
+            OnPropertyChanged();
+            foreach (var property in new[] { nameof(StatusText), nameof(TargetMessage), nameof(NoticeText), nameof(UpdateMessage), nameof(SettingsMessage), nameof(SignalState), nameof(MonitorCaption), nameof(EngineLine), nameof(TrayHint), nameof(UpdateButtonText) }) OnPropertyChanged(property);
+            ScheduleSave();
+        }
+    }
+
+    public MainWindowViewModel(IAudioDeviceService devices, IAudioRouteController router, ISettingsStore settings, IUpdateService? updates = null, IUiDispatcher? dispatcher = null, string? initialLanguage = null)
+    {
+        _initialLanguage = LanguageCatalog.Resolve(initialLanguage, System.Globalization.CultureInfo.CurrentUICulture.Name);
+        _language = _initialLanguage;
+        _localizer = new Localizer(_language);
         _devices = devices;
         _router = router;
         _settings = settings;
@@ -81,7 +104,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public IAsyncRelayCommand ResetSettingsCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public string AppVersion => $"v{typeof(MainWindowViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
-    public string UpdateButtonText => IsCheckingUpdates ? "확인 중…" : "업데이트 확인";
+    public string UpdateButtonText => Text(IsCheckingUpdates ? MessageKey.Checking : MessageKey.CheckUpdates);
     public bool IsCheckingUpdates
     {
         get => _isCheckingUpdates;
@@ -95,11 +118,17 @@ public sealed class MainWindowViewModel : ObservableObject
     public UpdateCheckResult? UpdateResult { get => _updateResult; private set => SetProperty(ref _updateResult, value); }
     public bool IsUpdateDialogOpen { get => _isUpdateDialogOpen; private set => SetProperty(ref _isUpdateDialogOpen, value); }
     public void DismissUpdate() => IsUpdateDialogOpen = false;
-    public string UpdateMessage { get => _updateMessage; private set => SetProperty(ref _updateMessage, value); }
-    public string SettingsMessage
+    public string UpdateMessage => _localizer.Render(_updateMessage);
+    private LocalizedMessage UpdateNotice
+    {
+        get => _updateMessage;
+        set => SetProperty(ref _updateMessage, value, nameof(UpdateMessage));
+    }
+    public string SettingsMessage => _localizer.Render(_settingsMessage);
+    private LocalizedMessage SettingsNotice
     {
         get => _settingsMessage;
-        private set { if (SetProperty(ref _settingsMessage, value)) OnPropertyChanged(nameof(HasSettingsMessage)); }
+        set { if (SetProperty(ref _settingsMessage, value, nameof(SettingsMessage))) { OnPropertyChanged(nameof(HasSettingsMessage)); } }
     }
     public bool HasSettingsMessage => !string.IsNullOrEmpty(SettingsMessage);
     public bool CanResetSettings => _initialized && !_shuttingDown && !_resetting && !StartCommand.IsRunning && !StopCommand.IsRunning;
@@ -147,28 +176,32 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string StatusText
+    public string StatusText => _localizer.Render(_statusText);
+    private LocalizedMessage Status
     {
         get => _statusText;
-        private set => SetProperty(ref _statusText, value);
+        set => SetProperty(ref _statusText, value, nameof(StatusText));
     }
 
-    public string TargetMessage
+    public string TargetMessage => _localizer.Render(_targetMessage);
+    private LocalizedMessage TargetNotice
     {
         get => _targetMessage;
-        private set => SetProperty(ref _targetMessage, value);
+        set => SetProperty(ref _targetMessage, value, nameof(TargetMessage));
     }
 
-    public string MonitorCaption
+    public string MonitorCaption => _localizer.Render(_monitorCaption);
+    private LocalizedMessage Monitor
     {
         get => _monitorCaption;
-        private set => SetProperty(ref _monitorCaption, value);
+        set => SetProperty(ref _monitorCaption, value, nameof(MonitorCaption));
     }
 
-    public string SignalState
+    public string SignalState => _localizer.Render(_signalState);
+    private LocalizedMessage Signal
     {
         get => _signalState;
-        private set => SetProperty(ref _signalState, value);
+        set => SetProperty(ref _signalState, value, nameof(SignalState));
     }
 
     public IReadOnlyList<float> Waveform
@@ -231,7 +264,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string ThresholdLabel => $"기준 {CompressorThresholdDb:0.0} dB";
+    public string ThresholdLabel => Text(MessageKey.ThresholdValue, CompressorThresholdDb.ToString("0.0"));
 
     public double CompressorRatio
     {
@@ -246,7 +279,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string RatioLabel => $"압축 비율 {CompressorRatio:0.0}:1";
+    public string RatioLabel => Text(MessageKey.RatioValue, CompressorRatio.ToString("0.0"));
 
     public bool IsMicMixEnabled
     {
@@ -275,7 +308,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string MicGainLabel => $"마이크 볼륨 {MicGainDb:+0.0;-0.0;0.0} dB";
+    public string MicGainLabel => $"{Text(MessageKey.MicrophoneGain)} {MicGainDb:+0.0;-0.0;0.0} dB";
 
     public decimal SampleRate
     {
@@ -332,11 +365,12 @@ public sealed class MainWindowViewModel : ObservableObject
         get => _minimizeToTray;
         set { if (SetProperty(ref _minimizeToTray, value)) { OnPropertyChanged(nameof(TrayHint)); ScheduleSave(); } }
     }
-    public string TrayHint => MinimizeToTray ? "닫기 · 최소화하면 트레이에서 계속 실행됩니다" : "닫으면 프로그램이 종료됩니다";
-    public string NoticeText
+    public string TrayHint => Text(MinimizeToTray ? MessageKey.TrayContinues : MessageKey.CloseExits);
+    public string NoticeText => _localizer.Render(_noticeText);
+    private LocalizedMessage Notice
     {
         get => _noticeText;
-        private set { if (SetProperty(ref _noticeText, value)) OnPropertyChanged(nameof(HasNotice)); }
+        set { if (SetProperty(ref _noticeText, value, nameof(NoticeText))) { OnPropertyChanged(nameof(HasNotice)); } }
     }
     public bool HasNotice => !string.IsNullOrEmpty(NoticeText);
     public bool ShouldShowUsageOnStartup => _hideUsageOnStartup != true;
@@ -353,20 +387,20 @@ public sealed class MainWindowViewModel : ObservableObject
     public bool CanEditRoute => !IsRouting && CanEditSettings;
     public bool IsStartEnabled => CanEditRoute && RouteValidator.GetError(SelectedSource, SelectedTarget, SelectedMicrophone, IsMicMixEnabled) is null;
     public bool IsStopEnabled => IsRouting && CanEditSettings;
-    public string RouteLine => SelectedSource is null || SelectedTarget is null ? "No route selected" : $"{SelectedSource.Name} -> {SelectedTarget.Name}";
-    public string EngineLine => $"{SampleRate / 1000:0.##} kHz · {(Channels == 1 ? "모노" : "스테레오")}";
+    public string RouteLine => SelectedSource is null || SelectedTarget is null ? Text(MessageKey.NoRoute) : $"{SelectedSource.Name} -> {SelectedTarget.Name}";
+    public string EngineLine => Text(MessageKey.EngineSummary, SampleRate / 1000, Text(Channels == 1 ? MessageKey.Mono : MessageKey.Stereo));
 
     public async Task InitializeAsync()
     {
         try
         {
             _loadedSettings = await _settings.LoadAsync();
-            NoticeText = _settings.LoadWarning ?? string.Empty;
+            Notice = _settings.LoadWarning ?? LocalizedMessage.Empty;
         }
         catch (Exception ex)
         {
             _loadedSettings = new AppSettings();
-            NoticeText = $"설정 로드 실패: {ex.Message}";
+            Notice = new(MessageKey.SettingsLoadFailed, ex);
         }
         ApplySettings(_loadedSettings);
         await RefreshDevicesAsync();
@@ -394,13 +428,13 @@ public sealed class MainWindowViewModel : ObservableObject
         using var cancellation = new CancellationTokenSource();
         _updateCancellation = cancellation;
         IsCheckingUpdates = true;
-        UpdateMessage = "새 버전을 확인하고 있습니다…";
+        UpdateNotice = new(MessageKey.UpdateChecking);
         try
         {
             var result = await _updates.CheckAsync(cancellation.Token);
             if (_shuttingDown) return;
             UpdateResult = result;
-            UpdateMessage = result.Message;
+            UpdateNotice = result.Message;
             IsUpdateDialogOpen = result.State == UpdateCheckState.Available;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
@@ -410,7 +444,7 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 UpdateResult = null;
                 IsUpdateDialogOpen = false;
-                UpdateMessage = $"업데이트 확인 실패: {ex.Message}";
+                UpdateNotice = new(MessageKey.UpdateCheckFailed, ex);
             }
         }
         finally { _updateCancellation = null; IsCheckingUpdates = false; }
@@ -429,16 +463,16 @@ public sealed class MainWindowViewModel : ObservableObject
             IsRouting = false;
             _loadedSettings = new AppSettings();
             ApplySettings(_loadedSettings);
-            NoticeText = string.Empty;
+            Notice = LocalizedMessage.Empty;
             await RefreshDevicesAsync();
             await SaveCurrentSettingsAsync();
             LevelPercent = 0;
             Waveform = Array.Empty<float>();
-            SignalState = "신호 없음";
-            if (!HasNotice) StatusText = "대기 중";
-            SettingsMessage = "설정을 기본값으로 초기화했습니다. 소리 연결은 중지되었습니다.";
+            Signal = new(MessageKey.NoSignal);
+            if (!HasNotice) Status = new(MessageKey.Ready);
+            SettingsNotice = new(MessageKey.SettingsResetDone);
         }
-        catch (Exception ex) { SettingsMessage = $"설정 초기화 실패: {ex.Message}"; }
+        catch (Exception ex) { SettingsNotice = new(MessageKey.SettingsResetFailed, ex); }
         finally
         {
             _resetting = false;
@@ -471,8 +505,8 @@ public sealed class MainWindowViewModel : ObservableObject
             Refill(Targets, Array.Empty<AudioDeviceDescriptor>());
             Refill(Microphones, Array.Empty<AudioDeviceDescriptor>());
             Refill(CableCandidates, Array.Empty<AudioDeviceDescriptor>());
-            StatusText = "장치 검색 실패";
-            NoticeText = ex.Message;
+            Status = new(MessageKey.DeviceDiscoveryFailed);
+            Notice = new(MessageKey.Detail, ex);
         }
         finally
         {
@@ -495,8 +529,8 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusText = "시작 실패";
-            NoticeText = ex.Message;
+            Status = new(MessageKey.StartFailed);
+            Notice = new(MessageKey.Detail, ex);
             IsRouting = false;
         }
     }
@@ -510,7 +544,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            NoticeText = $"중지 또는 설정 저장 실패: {ex.Message}";
+            Notice = new(MessageKey.StopOrSaveFailed, ex);
             IsRouting = false;
         }
     }
@@ -534,6 +568,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private AppSettings CaptureSettings() => new()
         {
+            Language = Language,
             SourceDeviceId = SelectedSource?.Id,
             TargetDeviceId = SelectedTarget?.Id,
             MicrophoneDeviceId = SelectedMicrophone?.Id,
@@ -568,7 +603,7 @@ public sealed class MainWindowViewModel : ObservableObject
             await _settings.SaveAsync(settings, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception ex) { NoticeText = $"설정 저장 실패: {ex.Message}"; }
+        catch (Exception ex) { Notice = new(MessageKey.SettingsSaveFailed, ex); }
     }
 
     public async Task<bool> ShutdownAsync()
@@ -590,7 +625,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            NoticeText = $"종료 준비 실패: {ex.Message}";
+            Notice = new(MessageKey.ShutdownFailed, ex);
             _shuttingDown = false;
             RefreshComputedState();
             return false;
@@ -599,6 +634,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void ApplySettings(AppSettings settings)
     {
+        Language = LanguageCatalog.Resolve(settings.Language, _initialLanguage);
         MinimizeToTray = settings.MinimizeToTray;
         _hideUsageOnStartup = settings.HideUsageOnStartup;
         OnPropertyChanged(nameof(ShouldShowUsageOnStartup));
@@ -623,10 +659,10 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         _dispatcher.Post(() =>
         {
-            StatusText = snapshot.State == RouteState.Faulted ? "연결 오류" : snapshot.Message;
-            if (snapshot.State == RouteState.Faulted) NoticeText = snapshot.Message;
+            Status = snapshot.State == RouteState.Faulted ? new(MessageKey.RouteError) : snapshot.Message;
+            if (snapshot.State == RouteState.Faulted) Notice = snapshot.Message;
             IsRouting = snapshot.State is RouteState.Starting or RouteState.Running or RouteState.Stopping;
-            MonitorCaption = snapshot.State == RouteState.Running ? "가상 케이블로 보내는 신호" : "재생음을 기다리는 중";
+            Monitor = snapshot.State == RouteState.Running ? new(MessageKey.MonitorRouting) : new(MessageKey.WaitingPlayback);
         });
     }
 
@@ -635,7 +671,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _dispatcher.Post(() =>
         {
             LevelPercent = Math.Clamp(snapshot.Rms * 100, 0, 100);
-            SignalState = snapshot.Peak > 0.01f ? "신호 감지됨" : "신호 없음";
+            Signal = snapshot.Peak > 0.01f ? new(MessageKey.SignalDetected) : new(MessageKey.NoSignal);
             Waveform = snapshot.Waveform;
         });
     }
@@ -643,11 +679,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private void UpdateTargetMessage()
     {
         var error = RouteValidator.GetError(SelectedSource, SelectedTarget, SelectedMicrophone, IsMicMixEnabled);
-        TargetMessage = error ?? (SelectedTarget switch
+        TargetNotice = error is { } key ? new(key) : (SelectedTarget switch
         {
-            null => "가상 케이블을 선택하세요.",
-            { IsVirtualCableCandidate: true } => "녹음 앱에서는 이 케이블의 녹음 장치를 선택하세요.",
-            _ => "가상 케이블이 아닌 출력 장치입니다."
+            null => new(MessageKey.SelectCable),
+            { IsVirtualCableCandidate: true } => new(MessageKey.CableInputHint),
+            _ => new(MessageKey.NotVirtualCable)
         });
     }
 

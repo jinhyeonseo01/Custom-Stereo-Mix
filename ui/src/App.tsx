@@ -1,3 +1,4 @@
+import { t, languages } from "./i18n";
 import React, {
   useEffect,
   useRef,
@@ -32,7 +33,7 @@ export default function App() {
       await request(command, payload);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "요청에 실패했습니다.");
+      setError(e instanceof Error ? e.message : t("RequestFailed"));
       return false;
     }
   }
@@ -46,9 +47,7 @@ export default function App() {
         <h1>Custom Stereo Mix</h1>
         <p role="status">
           {error ||
-            (connecting
-              ? "오디오 장치와 화면을 연결하고 있습니다…"
-              : "연결을 기다리고 있습니다…")}
+            (connecting ? t("ConnectingInterface") : t("WaitingConnection"))}
         </p>
       </main>
     );
@@ -61,10 +60,10 @@ export default function App() {
           </div>
           <div className="brand-copy">
             <h1>Custom Stereo Mix</h1>
-            <p>PC의 소리를 원하는 앱으로</p>
+            <p>{t("AppTagline")}</p>
           </div>
         </div>
-        <nav className="header-actions" aria-label="프로그램 메뉴">
+        <nav className="header-actions" aria-label={t("AppMenu")}>
           <span
             className={`status-chip ${state.isRouting ? "running" : ""}`}
             title={state.statusText}
@@ -77,11 +76,11 @@ export default function App() {
             onClick={() =>
               act(state.view === "help" ? "closeView" : "openHelp")
             }
-            title="스테레오 믹스 사용을 위한 추가 설정"
+            title={t("GuideExtraSetup")}
             aria-pressed={state.view === "help"}
           >
             <Icon name="help" />
-            <span>사용법</span>
+            <span>{t("Guide")}</span>
           </button>
           <button
             className={`button subtle ${state.view === "settings" ? "selected" : ""}`}
@@ -91,14 +90,12 @@ export default function App() {
             aria-pressed={state.view === "settings"}
           >
             <Icon name="settings" />
-            <span>설정</span>
+            <span>{t("Settings")}</span>
           </button>
         </nav>
       </header>
       {window.__stereoPreview && (
-        <div className="preview-note">
-          브라우저 미리보기 · 실제 오디오 연결 없음
-        </div>
+        <div className="preview-note">{t("PreviewBanner")}</div>
       )}
       <main className="page-scroll">
         <div className="page-content">
@@ -107,7 +104,7 @@ export default function App() {
               <span>{error || state.noticeText}</span>
               {error && (
                 <button
-                  aria-label="오류 알림 닫기"
+                  aria-label={t("DismissError")}
                   className="icon-button"
                   onClick={() => setError("")}
                 >
@@ -136,10 +133,10 @@ export default function App() {
                   act("guideDraft", { dontShowAgain: e.target.checked })
                 }
               />
-              다시 보지 않기
+              {t("DontShowAgain")}
             </label>
             <button className="button" onClick={() => act("closeView")}>
-              닫기
+              {t("Close")}
             </button>
           </>
         ) : (
@@ -151,7 +148,7 @@ export default function App() {
             {state.view === "settings" ? (
               <button className="button" onClick={() => act("closeView")}>
                 <Icon name="back" size={16} />
-                메인으로
+                {t("Back")}
               </button>
             ) : (
               <button
@@ -166,10 +163,10 @@ export default function App() {
               >
                 <Icon name={state.isRouting ? "stop" : "play"} size={17} />
                 {state.busy
-                  ? "처리 중…"
+                  ? t("Working")
                   : state.isRouting
-                    ? "연결 중지"
-                    : "소리 연결 시작"}
+                    ? t("StopRouting")
+                    : t("StartRouting")}
               </button>
             )}
           </>
@@ -199,8 +196,7 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
     const ok = await act("downloadUpdate");
     setOpening(false);
     if (ok) await act("dismissUpdate");
-    else
-      setError("설치기 링크를 열지 못했습니다. 설정에서 다시 확인해 주세요.");
+    else setError(t("InstallerLinkFailed"));
   }
   return (
     <dialog
@@ -212,31 +208,28 @@ function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
       }}
     >
       <div className="dialog-body">
-        <h3 id="update-dialog-title">새 업데이트가 있습니다</h3>
+        <h3 id="update-dialog-title">{t("UpdateAvailableTitle")}</h3>
         <p>
           {state.appVersion} → {state.latestVersion}
         </p>
-        <p>
-          새 버전의 Windows 설치기를 받을 수 있습니다. 다운로드 후 트레이에서
-          앱을 종료하고 설치기를 실행해 주세요.
-        </p>
+        <p>{t("UpdateInstallHint")}</p>
         {state.hasReleasePage && (
           <button className="button small" onClick={() => act("openRelease")}>
             <Icon name="external" size={14} />
-            변경 사항 보기
+            {t("ReleaseNotes")}
           </button>
         )}
         {error && <p role="alert">{error}</p>}
         <div className="dialog-actions">
           <button className="button" onClick={() => act("dismissUpdate")}>
-            나중에
+            {t("Later")}
           </button>
           <button
             className="button primary"
             disabled={!state.hasUpdateInstaller || opening}
             onClick={openInstaller}
           >
-            {opening ? "여는 중…" : "설치기 다운로드"}
+            {opening ? t("Opening") : t("DownloadInstaller")}
           </button>
         </div>
       </div>
@@ -272,7 +265,7 @@ function DeviceSelect({
         title={current?.name}
       >
         <option value="" disabled>
-          {devices.length ? "장치 선택" : "사용 가능한 장치 없음"}
+          {devices.length ? t("SelectDevice") : t("NoDevices")}
         </option>
         {devices.map((d) => (
           <option key={d.id} value={d.id}>
@@ -281,7 +274,7 @@ function DeviceSelect({
         ))}
       </select>
       <span className="caption">
-        {current?.summary ?? "장치를 연결한 뒤 새로고침해 주세요"}
+        {current?.summary ?? t("RefreshDeviceHint")}
       </span>
     </label>
   );
@@ -290,20 +283,20 @@ function MainPage({ state, act, patch }: Actions) {
   return (
     <>
       <div className="section-heading">
-        <h2>소리 연결</h2>
+        <h2>{t("AudioRouting")}</h2>
         <button
           className="button small"
           disabled={!state.canEditRoute}
           onClick={() => act("refresh")}
         >
           <Icon name="refresh" size={14} />
-          새로고침
+          {t("Refresh")}
         </button>
       </div>
       <div className="route-grid">
         <section className="card">
           <DeviceSelect
-            label="재생 소리"
+            label={t("PlaybackSource")}
             icon="speaker"
             devices={state.sources}
             selected={state.sourceDeviceId}
@@ -316,7 +309,7 @@ function MainPage({ state, act, patch }: Actions) {
         </span>
         <section className="card">
           <DeviceSelect
-            label="보낼 장치"
+            label={t("OutputTarget")}
             icon="cable"
             devices={state.targets}
             selected={state.targetDeviceId}
@@ -328,9 +321,9 @@ function MainPage({ state, act, patch }: Actions) {
       <p className="route-help caption">{state.targetMessage}</p>
       <SignalMonitor />
       <div className="gain-row">
-        <span className="field-title">출력 볼륨</span>
+        <span className="field-title">{t("OutputGain")}</span>
         <Range
-          label="출력 볼륨"
+          label={t("OutputGain")}
           value={state.settings.gainDb}
           min={-12}
           max={12}
@@ -341,7 +334,7 @@ function MainPage({ state, act, patch }: Actions) {
       </div>
       <section className="card mic-card">
         <Switch
-          label="마이크도 함께 보내기"
+          label={t("IncludeMicrophone")}
           icon="mic"
           value={state.settings.isMicMixEnabled}
           disabled={!state.canEditRoute}
@@ -350,7 +343,7 @@ function MainPage({ state, act, patch }: Actions) {
         {state.settings.isMicMixEnabled && (
           <div className="mic-details">
             <DeviceSelect
-              label="마이크"
+              label={t("Microphone")}
               icon="mic"
               devices={state.microphones}
               selected={state.microphoneDeviceId}
@@ -359,7 +352,7 @@ function MainPage({ state, act, patch }: Actions) {
             />
             <div className="gain-row">
               <Range
-                label="마이크 볼륨"
+                label={t("MicrophoneGain")}
                 value={state.settings.micGainDb}
                 min={-12}
                 max={12}
@@ -378,13 +371,13 @@ function SignalMonitor() {
   const meter = useSyncExternalStore(subscribeMeter, readMeter);
   const values = meter.samples.length ? meter.samples : Array(96).fill(0);
   return (
-    <section className="card signal-card" aria-label="출력 신호 모니터">
+    <section className="card signal-card" aria-label={t("OutputMonitor")}>
       <div className="signal-heading">
         <div>
-          <strong>신호 모니터</strong>
+          <strong>{t("SignalMonitor")}</strong>
           <span className="caption">{meter.signalState}</span>
         </div>
-        <output className="level" aria-label="신호 레벨">
+        <output className="level" aria-label={t("SignalLevel")}>
           {Math.round(meter.levelPercent)}%
         </output>
       </div>
@@ -585,13 +578,13 @@ function SettingsPage({ state, act, patch }: Actions) {
   return (
     <>
       <div className="page-heading">
-        <h2>설정</h2>
-        <p className="caption">변경한 설정은 자동으로 저장됩니다</p>
+        <h2>{t("Settings")}</h2>
+        <p className="caption">{t("AutoSaveHint")}</p>
       </div>
       <section className="card settings-card">
         <div className="section-heading">
           <div>
-            <h3>업데이트</h3>
+            <h3>{t("Updates")}</h3>
             <p className="caption">{state.appVersion}</p>
           </div>
           <button
@@ -599,7 +592,7 @@ function SettingsPage({ state, act, patch }: Actions) {
             disabled={state.updating}
             onClick={() => act("checkUpdates")}
           >
-            {state.updating ? "확인 중…" : "업데이트 확인"}
+            {state.updating ? t("Checking") : t("CheckUpdates")}
           </button>
         </div>
         <p className="caption" role="status">
@@ -608,30 +601,45 @@ function SettingsPage({ state, act, patch }: Actions) {
         {state.hasReleasePage && (
           <button className="button small" onClick={() => act("openRelease")}>
             <Icon name="external" size={14} />
-            릴리즈 페이지
+            {t("ReleasePage")}
           </button>
         )}
       </section>
       <section className="card settings-card">
-        <h3>프로그램 동작</h3>
+        <h3>{t("AppBehavior")}</h3>
+        <label className="device-field language-field">
+          <span className="field-title">{t("SettingsLanguage")}</span>
+          <select
+            value={state.settings.language}
+            disabled={!state.canEditSettings}
+            onChange={(e) => patch({ language: e.target.value })}
+          >
+            {languages.map((language) => (
+              <option key={language.code} value={language.code}>
+                {language.name}
+              </option>
+            ))}
+          </select>
+          <span className="caption">{t("LanguageChangeHint")}</span>
+        </label>
         <Switch
-          label="시스템 트레이 사용"
-          description="닫기와 최소화 시 트레이에서 계속 실행"
+          label={t("UseTray")}
+          description={t("TrayBehaviorHint")}
           value={state.settings.minimizeToTray}
           disabled={!state.canEditSettings}
           onChange={(minimizeToTray) => patch({ minimizeToTray })}
         />
         <p className="inset-note caption">
-          트레이 우클릭 → 종료는 항상 프로그램을 종료합니다.
+          {t("TrayExitHint")}
           <br />
-          트레이 사용을 끄면 닫기 버튼으로도 종료됩니다.
+          {t("TrayDisabledHint")}
         </p>
       </section>
       <section className="card settings-card">
-        <h3>소리 보정</h3>
+        <h3>{t("AudioProcessing")}</h3>
         <Switch
-          label="큰 소리 부드럽게 줄이기"
-          description="컴프레서 · 순간적인 큰 소리를 줄입니다"
+          label={t("ReduceLoudSounds")}
+          description={t("CompressorHint")}
           value={state.settings.compressorEnabled}
           disabled={!state.canEditSettings}
           onChange={(compressorEnabled) => patch({ compressorEnabled })}
@@ -640,10 +648,13 @@ function SettingsPage({ state, act, patch }: Actions) {
           <div className="two-fields">
             <label className="slider-field">
               <span className="caption">
-                기준 {state.settings.compressorThresholdDb.toFixed(1)} dB
+                {t(
+                  "ThresholdValue",
+                  state.settings.compressorThresholdDb.toFixed(1),
+                )}
               </span>
               <Range
-                label="컴프레서 기준"
+                label={t("CompressorThreshold")}
                 value={state.settings.compressorThresholdDb}
                 min={-40}
                 max={-3}
@@ -655,10 +666,10 @@ function SettingsPage({ state, act, patch }: Actions) {
             </label>
             <label className="slider-field">
               <span className="caption">
-                압축 비율 {state.settings.compressorRatio.toFixed(1)}:1
+                {t("RatioValue", state.settings.compressorRatio.toFixed(1))}
               </span>
               <Range
-                label="컴프레서 압축 비율"
+                label={t("CompressorRatio")}
                 value={state.settings.compressorRatio}
                 min={1}
                 max={10}
@@ -670,10 +681,10 @@ function SettingsPage({ state, act, patch }: Actions) {
         )}
       </section>
       <section className="card settings-card">
-        <h3>오디오 엔진</h3>
+        <h3>{t("AudioEngine")}</h3>
         <div className="two-fields">
           <Numeric
-            label="샘플레이트 (Hz)"
+            label={t("SampleRate")}
             name="sampleRate"
             state={state}
             min={22050}
@@ -682,7 +693,7 @@ function SettingsPage({ state, act, patch }: Actions) {
             patch={patch}
           />
           <Numeric
-            label="채널 · 1 모노 / 2 스테레오"
+            label={t("Channels")}
             name="channels"
             state={state}
             min={1}
@@ -691,7 +702,7 @@ function SettingsPage({ state, act, patch }: Actions) {
             patch={patch}
           />
           <Numeric
-            label="지연 (ms)"
+            label={t("Latency")}
             name="latencyMilliseconds"
             state={state}
             min={10}
@@ -700,7 +711,7 @@ function SettingsPage({ state, act, patch }: Actions) {
             patch={patch}
           />
           <Numeric
-            label="버퍼 용량 (ms)"
+            label={t("Buffer")}
             name="bufferMilliseconds"
             state={state}
             min={80}
@@ -710,23 +721,20 @@ function SettingsPage({ state, act, patch }: Actions) {
           />
         </div>
         <p className="caption">
-          기본값: 48 kHz · 스테레오 · 지연 50 ms
+          {t("EngineDefaults")}
           <br />
-          소리 연결을 중지한 뒤 변경할 수 있습니다.
+          {t("StopBeforeEngineChange")}
         </p>
       </section>
       <section className="card settings-card">
-        <h3>설정 관리</h3>
-        <p className="caption">
-          장치 선택, 볼륨, 보정, 엔진, 트레이 설정을 기본값으로 되돌립니다. 실행
-          중인 소리 연결은 중지됩니다.
-        </p>
+        <h3>{t("ManageSettings")}</h3>
+        <p className="caption">{t("ResetDescription")}</p>
         <button
           className="button"
           disabled={!state.canResetSettings}
           onClick={() => setResetOpen(true)}
         >
-          설정 초기화
+          {t("ResetSettings")}
         </button>
         {state.settingsMessage && (
           <p className="caption" role="status">
@@ -740,14 +748,11 @@ function SettingsPage({ state, act, patch }: Actions) {
         onClose={() => setResetOpen(false)}
       >
         <div className="dialog-body">
-          <h3>설정을 초기화할까요?</h3>
-          <p>
-            소리 연결이 중지되고 모든 설정이 기본값으로 돌아갑니다. 장치는
-            자동으로 다시 선택됩니다.
-          </p>
+          <h3>{t("ResetTitle")}</h3>
+          <p>{t("ResetConfirmation")}</p>
           <div className="dialog-actions">
             <button className="button" onClick={() => setResetOpen(false)}>
-              취소
+              {t("Cancel")}
             </button>
             <button
               className="button danger"
@@ -756,7 +761,7 @@ function SettingsPage({ state, act, patch }: Actions) {
                 await act("reset");
               }}
             >
-              초기화
+              {t("Reset")}
             </button>
           </div>
         </div>
@@ -769,28 +774,22 @@ function HelpPage() {
   return (
     <>
       <div className="page-heading">
-        <h2>스테레오 믹스 사용 안내</h2>
-        <p className="caption">PC 소리를 다른 앱의 마이크 입력으로 전달하기</p>
+        <h2>{t("GuideTitle")}</h2>
+        <p className="caption">{t("GuideSubtitle")}</p>
       </div>
       <section className="card settings-card">
-        <h3>스테레오 믹스 사용을 위한 추가 설정</h3>
+        <h3>{t("GuideExtraSetup")}</h3>
         <p>
-          이 프로그램으로 PC 소리를 다른 앱의 마이크 입력에 전달하려면,{" "}
-          <strong>가상 오디오 케이블을 별도로 설치해야 합니다.</strong>
+          <strong>{t("GuideCableRequired")}</strong>
         </p>
-        <p className="caption">
-          이미 설치되어 있다면 기존 장치를 사용할 수 있습니다.
-        </p>
-        <p className="caption">
-          VB-CABLE을 사용하거나, 재생 출력을 녹음 입력으로 연결해 주는 다른 가상
-          오디오 장치를 사용하세요.
-        </p>
+        <p className="caption">{t("GuideExistingCable")}</p>
+        <p className="caption">{t("GuideCableChoice")}</p>
       </section>
       <section className="card settings-card">
-        <h3>VB-CABLE 기준 설정 방법</h3>
+        <h3>{t("GuideCableSetup")}</h3>
         <ol className="steps">
           <li>
-            <span>VB-CABLE을 설치하고 PC를 다시 시작합니다.</span>
+            <span>{t("GuideInstallCable")}</span>
             <button
               className="button small"
               onClick={async () => {
@@ -798,42 +797,28 @@ function HelpPage() {
                   await request("openCableWebsite");
                   setError("");
                 } catch {
-                  setError(
-                    "페이지를 열지 못했습니다. 브라우저에서 https://vb-audio.com/Cable/ 에 접속해 주세요.",
-                  );
+                  setError(t("GuidePageFailed"));
                 }
               }}
             >
-              설치 페이지
+              {t("InstallPage")}
               <Icon name="external" size={14} />
             </button>
           </li>
           <li>
-            <span>
-              이 프로그램의 <strong>재생 소리</strong>에서 사용할
-              헤드폰·스피커를 선택합니다.
-            </span>
+            <span>{t("GuideChooseSource")}</span>
           </li>
           <li>
-            <span>
-              <strong>보낼 장치</strong>에서 <b>CABLE Input</b>을 선택하고{" "}
-              <strong>소리 연결 시작</strong>을 누릅니다.
-            </span>
+            <span>{t("GuideChooseTarget")}</span>
           </li>
           <li>
-            <span>
-              Discord·녹음·STT 등 사용할 앱의 <strong>입력 장치</strong>를{" "}
-              <b>CABLE Output</b>으로 선택합니다.
-            </span>
+            <span>{t("GuideChooseInput")}</span>
           </li>
         </ol>
       </section>
       <aside className="flow-note">
-        <strong>이 프로그램 → CABLE Input → CABLE Output → 사용할 앱</strong>
-        <p className="caption">
-          다른 가상 오디오 장치도 해당 제품의 재생·녹음 장치 쌍을 같은 방식으로
-          연결하면 됩니다.
-        </p>
+        <strong>{t("GuideFlow")}</strong>
+        <p className="caption">{t("GuideOtherCable")}</p>
       </aside>
       {error && (
         <p className="notice" role="alert">

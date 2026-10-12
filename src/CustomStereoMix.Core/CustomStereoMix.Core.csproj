@@ -1,2 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\locales\*.json" LogicalName="CustomStereoMix.Locales.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

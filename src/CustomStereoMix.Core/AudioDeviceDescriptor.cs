@@ -14,8 +14,8 @@ public sealed record AudioDeviceDescriptor(
     {
         get
         {
-            var defaultBadge = IsDefault ? " · 기본" : string.Empty;
-            return $"{SampleRate / 1000.0:0.##} kHz · {Channels}채널{defaultBadge}";
+            var defaultBadge = IsDefault ? " · Default" : string.Empty;
+            return $"{SampleRate / 1000.0:0.##} kHz · {Channels} ch{defaultBadge}";
         }
     }
 

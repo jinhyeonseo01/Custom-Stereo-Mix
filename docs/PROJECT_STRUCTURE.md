@@ -2,6 +2,7 @@
 
 ```text
 ui/                         React + TypeScript 화면, CSS, Lucide 아이콘
+locales/                    C#·React가 공유하는 언어별 메시지 키·번역 리소스
 src/CustomStereoMix.App/     WPF 창, WebView2 호스트, 트레이와 종료 처리
 src/CustomStereoMix.State/   앱 상태, 명령과 설정 저장, JSON UI 브리지
 src/CustomStereoMix.Audio/   NAudio/WASAPI 장치, 세션, 리샘플링, DSP, 저장소
@@ -31,6 +32,8 @@ WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시합니
 설치기 빌드는 `build_installer.ps1`을 사용합니다. Node 의존성 복원, SVG 기반 다중 해상도 아이콘 생성, .NET self-contained publish와 Inno Setup 컴파일을 수행합니다. 설치 시 WebView2가 없을 때만 공식 런타임 부트스트래퍼를 실행하며 가상 케이블 드라이버는 포함하지 않습니다.
 
 설정은 장치 ID로 저장하며 기본값 복구와 초기화가 같은 공통 검증을 사용합니다. 시작·중지·초기화 처리 중에는 관련 설정을 잠그고, 종료 시 진행 중인 명령을 기다린 후 오디오를 정리하고 저장합니다.
+
+언어는 `AppSettings.Language`에 저장합니다. `LanguageCatalog`는 공통 JSON 리소스를 발견하고, C#의 `MessageKey`와 React의 키 타입으로 번역 식별자를 검증합니다. 상태·오류·업데이트는 `LocalizedMessage`의 키와 매개변수로 유지하여 언어 변경 시 다시 표시합니다. 설치기는 별도 `initial-language.json`을 만들며 사용자 설정을 덮어쓰지 않습니다. 언어를 바꿔도 WASAPI 세션은 유지합니다. 확장 방법은 [LOCALIZATION.md](LOCALIZATION.md)에 있습니다.
 
 
 ## 릴리즈와 업데이트

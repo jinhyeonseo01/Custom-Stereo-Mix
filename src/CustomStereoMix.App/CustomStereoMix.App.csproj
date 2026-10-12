@@ -8,6 +8,7 @@
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <FrontendInputs Include="..\..\locales\*.json" />
     <ProjectReference Include="..\CustomStereoMix.Core\CustomStereoMix.Core.csproj" />
     <ProjectReference Include="..\CustomStereoMix.Audio\CustomStereoMix.Audio.csproj" />
     <ProjectReference Include="..\CustomStereoMix.State\CustomStereoMix.State.csproj" />

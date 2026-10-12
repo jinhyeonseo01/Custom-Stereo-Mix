@@ -81,7 +81,7 @@ static class GitHubUpdateTests
 
     public static void StartupFailure() => Run(async () =>
     {
-        foreach (var result in new[] { new UpdateCheckResult(UpdateCheckState.NoRelease, "없음"), new UpdateCheckResult(UpdateCheckState.UpToDate, "최신") })
+        foreach (var result in new[] { new UpdateCheckResult(UpdateCheckState.NoRelease, new(MessageKey.NoRelease)), new UpdateCheckResult(UpdateCheckState.UpToDate, new(MessageKey.UpToDate)) })
         {
             var vm = Model(new Updates(_ => Task.FromResult(result))); await vm.InitializeAsync(); await vm.CheckUpdatesOnStartupAsync();
             Assert(!vm.IsUpdateDialogOpen && vm.IsStartEnabled, "Unnecessary startup popup or disabled audio");
@@ -89,7 +89,7 @@ static class GitHubUpdateTests
         }
         var failing = Model(new Updates(_ => throw new HttpRequestException("Offline")));
         await failing.InitializeAsync(); await failing.CheckUpdatesOnStartupAsync();
-        Assert(!failing.IsUpdateDialogOpen && failing.IsStartEnabled && failing.UpdateMessage.Contains("실패"), "Network failure interrupted startup");
+        Assert(!failing.IsUpdateDialogOpen && failing.IsStartEnabled && failing.UpdateMessage.Contains("Offline"), "Network failure interrupted startup");
         await failing.ShutdownAsync();
     });
 
@@ -128,7 +128,7 @@ static class GitHubUpdateTests
     static MainWindowViewModel Model(IUpdateService updates, IAudioRouteController? router = null) => new(new FakeDevices(), router ?? new OrderedRouter(), new MemoryStore(), updates);
     static JsonElement Message(string command) => JsonSerializer.SerializeToElement(new { id = Guid.NewGuid().ToString("N"), command });
     static Uri Installer(string tag) => new($"https://github.com/{GitHubReleaseUpdateService.Repository}/releases/download/{tag}/CustomStereoMix-{tag[1..]}-Setup-x64.exe");
-    static UpdateCheckResult Available() => new(UpdateCheckState.Available, "새 버전", "v1.10.0", new Uri($"https://github.com/{GitHubReleaseUpdateService.Repository}/releases/tag/v1.10.0"), Installer("v1.10.0"));
+    static UpdateCheckResult Available() => new(UpdateCheckState.Available, new(MessageKey.UpdateAvailable, "v1.10.0"), "v1.10.0", new Uri($"https://github.com/{GitHubReleaseUpdateService.Repository}/releases/tag/v1.10.0"), Installer("v1.10.0"));
     static string ReleaseJson(string tag, bool asset, string? url, bool draft, bool prerelease) => JsonSerializer.Serialize(new
     {
         tag_name = tag, draft, prerelease,

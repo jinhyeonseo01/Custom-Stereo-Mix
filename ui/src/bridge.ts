@@ -1,8 +1,9 @@
+import { t, setLanguage } from "./i18n";
 import type { AppState, Command, Meter, WebViewBridge } from "./types";
 let transport: WebViewBridge | undefined;
 let connection: Promise<void> | undefined;
 let state: AppState | null = null;
-let meter: Meter = { levelPercent: 0, signalState: "신호 없음", samples: [] };
+let meter: Meter = { levelPercent: 0, signalState: t("NoSignal"), samples: [] };
 let sequence = 0;
 const stateListeners = new Set<() => void>();
 const meterListeners = new Set<() => void>();
@@ -31,6 +32,7 @@ export const readMeter = () => meter;
 function updateState(value: AppState) {
   if (state && value.revision <= state.revision) return;
   state = value;
+  setLanguage(value.settings.language);
   stateListeners.forEach((fn) => fn());
 }
 export function connect() {
@@ -43,10 +45,7 @@ async function connectTransport() {
     transport = createPreviewBridge();
     window.__stereoPreview = true;
   }
-  if (!transport)
-    throw new Error(
-      "데스크톱 앱과 연결하지 못했습니다. 앱에서 다시 실행해 주세요.",
-    );
+  if (!transport) throw new Error(t("DesktopConnectionFailed"));
   transport.addEventListener("message", (event) => {
     const message = event.data;
     if (message.type === "state") updateState(message.state);
@@ -61,7 +60,7 @@ async function connectTransport() {
       clearTimeout(call.timer);
       pending.delete(message.id);
       if (message.ok) call.resolve();
-      else call.reject(new Error(message.error || "요청에 실패했습니다."));
+      else call.reject(new Error(message.error || t("RequestFailed")));
     }
   });
   await request("ready");
@@ -69,15 +68,13 @@ async function connectTransport() {
 export function request(command: Command, payload: unknown = {}) {
   return new Promise<void>((resolve, reject) => {
     if (!transport) {
-      reject(new Error("데스크톱 연결을 기다려 주세요."));
+      reject(new Error(t("WaitDesktop")));
       return;
     }
     const id = `${Date.now()}-${++sequence}`;
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(
-        new Error("응답이 지연되고 있습니다. 현재 연결 상태를 확인해 주세요."),
-      );
+      reject(new Error(t("ResponseDelayed")));
     }, 15000);
     pending.set(id, { resolve, reject, timer });
     try {
@@ -85,9 +82,7 @@ export function request(command: Command, payload: unknown = {}) {
     } catch (error) {
       clearTimeout(timer);
       pending.delete(id);
-      reject(
-        error instanceof Error ? error : new Error("요청을 보내지 못했습니다."),
-      );
+      reject(error instanceof Error ? error : new Error(t("SendFailed")));
     }
   });
 }

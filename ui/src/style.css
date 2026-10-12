@@ -628,6 +628,12 @@ input[type="range"]:disabled {
 .loading p {
   color: #5d6d85;
 }
+.language-field .caption {
+  white-space: normal;
+}
+.language-field {
+  margin-bottom: 6px;
+}
 dialog {
   border: 1px solid #e2eaf4;
   border-radius: 15px;

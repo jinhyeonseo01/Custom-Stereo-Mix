@@ -9,9 +9,9 @@
   <Border x:Name="StartupPanel" Background="#F5F7FB" Padding="28">
    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="440">
     <TextBlock Text="Custom Stereo Mix" FontSize="24" FontWeight="SemiBold" Foreground="#202B40" />
-    <TextBlock x:Name="StartupMessage" Text="화면을 준비하고 있습니다…" TextWrapping="Wrap" Margin="0,16,0,12" Foreground="#526079" FontSize="14" />
-    <Button x:Name="RetryButton" Content="다시 시도" Click="RetryStartup" Visibility="Collapsed" Padding="14,8" Margin="0,0,0,8" />
-    <Button x:Name="RuntimeButton" Content="WebView2 Runtime 설치 안내" Click="OpenRuntimeWebsite" Visibility="Collapsed" Padding="14,8" />
+    <TextBlock x:Name="StartupMessage" TextWrapping="Wrap" Margin="0,16,0,12" Foreground="#526079" FontSize="14" />
+    <Button x:Name="RetryButton" Click="RetryStartup" Visibility="Collapsed" Padding="14,8" Margin="0,0,0,8" />
+    <Button x:Name="RuntimeButton" Click="OpenRuntimeWebsite" Visibility="Collapsed" Padding="14,8" />
    </StackPanel>
   </Border>
  </Grid>
