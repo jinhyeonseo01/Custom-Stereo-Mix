@@ -41,6 +41,10 @@ export interface AppState {
   trayHint: string;
   appVersion: string;
   updateMessage: string;
+  isUpdateDialogOpen: boolean;
+  latestVersion: string | null;
+  hasUpdateInstaller: boolean;
+  hasReleasePage: boolean;
   settingsMessage: string;
   busy: boolean;
   updating: boolean;
@@ -58,6 +62,9 @@ export type Command =
   | "refresh"
   | "reset"
   | "checkUpdates"
+  | "dismissUpdate"
+  | "openRelease"
+  | "downloadUpdate"
   | "patch"
   | "openHelp"
   | "openSettings"

@@ -32,3 +32,7 @@ WebView2는 배포 폴더의 `wwwroot`를 가상 HTTPS 호스트로 표시합니
 
 설정은 장치 ID로 저장하며 기본값 복구와 초기화가 같은 공통 검증을 사용합니다. 시작·중지·초기화 처리 중에는 관련 설정을 잠그고, 종료 시 진행 중인 명령을 기다린 후 오디오를 정리하고 저장합니다.
 
+
+## 릴리즈와 업데이트
+
+`.github/workflows/release.yml`은 vX.Y.Z 태그에서 설치기를 빌드하고 GitHub Releases에 게시합니다. `ReleaseVersion`이 태그의 숫자 형식을 정의하고 `GitHubReleaseUpdateService`가 공개 정식 릴리즈와 설치기 링크를 검증합니다. WPF 호스트는 첫 화면 준비 후 백그라운드 확인을 시작하며 `UiBridge`는 업데이트 상태·팝업과 허용된 릴리즈 링크 명령을 React에 연결합니다. 자세한 배포 절차는 [RELEASING.md](RELEASING.md)를 참고하세요.

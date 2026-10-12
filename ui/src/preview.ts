@@ -64,6 +64,10 @@ export function createPreviewBridge(): WebViewBridge {
     trayHint: "닫기 · 최소화하면 트레이에서 계속 실행됩니다",
     appVersion: "v1.1.0",
     updateMessage: "업데이트 배포 준비 중입니다.",
+    isUpdateDialogOpen: false,
+    latestVersion: null,
+    hasUpdateInstaller: false,
+    hasReleasePage: false,
     settingsMessage: "",
     busy: false,
     updating: false,
@@ -151,7 +155,14 @@ export function createPreviewBridge(): WebViewBridge {
           break;
         case "checkUpdates":
           state.updateMessage =
-            "업데이트 배포 준비 중입니다. 배포가 시작되면 여기에서 확인할 수 있습니다.";
+            "브라우저 미리보기에서는 실제 업데이트 서버에 연결하지 않습니다.";
+          break;
+        case "dismissUpdate":
+          state.isUpdateDialogOpen = false;
+          break;
+        case "openRelease":
+        case "downloadUpdate":
+          state.noticeText = "미리보기에서는 외부 페이지를 열지 않습니다.";
           break;
         case "openCableWebsite":
           state.noticeText = "미리보기에서는 외부 페이지를 열지 않습니다.";

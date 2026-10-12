@@ -1,15 +1,15 @@
 namespace CustomStereoMix.Core;
 
-public enum UpdateCheckState { NotConfigured, UpToDate, Available }
+public enum UpdateCheckState { NotConfigured, NoRelease, UpToDate, Available }
 
-public sealed record UpdateCheckResult(UpdateCheckState State, string Message, string? LatestVersion = null, Uri? ReleasePage = null);
+public sealed record UpdateCheckResult(UpdateCheckState State, string Message, string? LatestVersion = null, Uri? ReleasePage = null, Uri? InstallerUrl = null);
 
 public interface IUpdateService
 {
     Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default);
 }
 
-/// <summary>Replace this service with a GitHub Releases provider when a release repository is configured.</summary>
+/// <summary>Offline fallback for hosts which have not supplied a release provider.</summary>
 public sealed class UnconfiguredUpdateService : IUpdateService
 {
     public Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)

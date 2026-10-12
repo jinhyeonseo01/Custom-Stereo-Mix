@@ -30,7 +30,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => FitInitialWindow();
         _model = model;
         _browserData = browserData ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CustomStereoMix", "WebView2");
-        _bridge = new UiBridge(model, () => OpenWebsiteAsync("https://vb-audio.com/Cable/"));
+        _bridge = new UiBridge(model, () => OpenWebsiteAsync("https://vb-audio.com/Cable/"), uri => OpenWebsiteAsync(uri.AbsoluteUri));
         var menu = new Forms.ContextMenuStrip { Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular) };
         menu.Items.Add("창 열기", null, (_, _) => RestoreWindow());
         menu.Items.Add("사용법", null, (_, _) => OpenView("help"));
@@ -153,6 +153,8 @@ public partial class MainWindow : Window
                 _meterDirty = true;
             }
             Post(response);
+            if (command.ValueKind == JsonValueKind.String && command.GetString() == "ready")
+                _ = _model.CheckUpdatesOnStartupAsync();
         }
         catch (Exception ex) { Debug.WriteLine($"Web message rejected: {ex.Message}"); }
     }

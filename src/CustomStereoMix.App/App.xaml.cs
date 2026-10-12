@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Net.Http;
 using CustomStereoMix.Audio;
 using CustomStereoMix.State;
 
@@ -8,6 +9,7 @@ public partial class App : Application
 {
     private NaudioDeviceService? _devices;
     private Mutex? _instance;
+    private HttpClient? _updatesClient;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -18,7 +20,9 @@ public partial class App : Application
             Shutdown(); return;
         }
         _devices = new NaudioDeviceService();
-        var model = new MainWindowViewModel(_devices, new NaudioRouteController(_devices), new JsonSettingsStore(), dispatcher: new WpfUiDispatcher(Dispatcher));
+        _updatesClient = new HttpClient();
+        var updates = new GitHubReleaseUpdateService(_updatesClient, typeof(MainWindowViewModel).Assembly.GetName().Version!);
+        var model = new MainWindowViewModel(_devices, new NaudioRouteController(_devices), new JsonSettingsStore(), updates, new WpfUiDispatcher(Dispatcher));
         MainWindow = new MainWindow(model);
         MainWindow.Show();
     }
@@ -26,6 +30,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _devices?.Dispose();
+        _updatesClient?.Dispose();
         _instance?.Dispose();
         base.OnExit(e);
     }

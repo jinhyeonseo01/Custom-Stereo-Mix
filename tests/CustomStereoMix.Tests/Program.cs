@@ -28,7 +28,14 @@ var tests = new (string Name, Action Body)[]
     ("non-finite capture samples become silence", NonFiniteCapture),
     ("UI bridge validates whole patches and keeps state on reload", BridgeValidation),
     ("shutdown waits for pending start before stopping audio", ShutdownDuringStart),
-    ("shutdown waits for pending settings reset", ShutdownDuringReset)
+    ("shutdown waits for pending settings reset", ShutdownDuringReset),
+    ("release tags use strict numeric versions", GitHubUpdateTests.ReleaseTags),
+    ("GitHub releases compare numeric versions and validate installer assets", GitHubUpdateTests.ReleaseResponses),
+    ("update checks handle missing releases, API failures and cancellation", GitHubUpdateTests.ErrorResponses),
+    ("startup update popup appears once and can be reopened manually", GitHubUpdateTests.StartupPopup),
+    ("startup update failure leaves audio controls usable", GitHubUpdateTests.StartupFailure),
+    ("update network request does not hold the audio command gate", GitHubUpdateTests.CommandGate),
+    ("update links are restricted to the configured repository", GitHubUpdateTests.LinkValidation)
 };
 
 var failures = 0;

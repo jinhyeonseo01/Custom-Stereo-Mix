@@ -1,0 +1,91 @@
+name: Build and publish Windows installer
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TAG_NAME: ${{ github.ref_name }}
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag
+        id: version
+        run: |
+          if ($env:TAG_NAME -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z') {
+            throw 'Release tags must be exactly vX.Y.Z, for example v1.2.3.'
+          }
+          $releaseVersion = [Version]::Parse($env:TAG_NAME.Substring(1))
+          if ($releaseVersion.Major -gt 65535 -or $releaseVersion.Minor -gt 65535 -or $releaseVersion.Build -gt 65535) {
+            throw 'Each version component must fit a .NET assembly version (0..65535).'
+          }
+          "RELEASE_VERSION=$releaseVersion" >> $env:GITHUB_ENV
+          "version=$releaseVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Run logic regression tests
+        run: |
+          dotnet run --project tests/CustomStereoMix.Tests/CustomStereoMix.Tests.csproj -c Release "-p:Version=$env:RELEASE_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed.' }
+
+      - name: Install pinned Inno Setup compiler
+        run: |
+          $compilerPath = ./tools/install_inno_setup.ps1 -DestinationDirectory (Join-Path $env:RUNNER_TEMP 'stereomix-inno')
+          "ISCC_PATH=$compilerPath" >> $env:GITHUB_ENV
+
+      - name: Build versioned installer
+        run: |
+          ./build_installer.ps1 -Version $env:RELEASE_VERSION -IsccPath $env:ISCC_PATH
+          $assemblyPath = Join-Path $PWD 'artifacts/webview2/CustomStereoMix.State.dll'
+          $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($assemblyPath).Version.ToString(3)
+          if ($assemblyVersion -ne $env:RELEASE_VERSION) { throw 'App version does not match tag.' }
+          $installerName = "CustomStereoMix-$env:RELEASE_VERSION-Setup-x64.exe"
+          $installerPath = Join-Path $PWD "artifacts/setup/$installerName"
+          $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$installerHash  $installerName" | Set-Content -LiteralPath "$installerPath.sha256" -Encoding ascii
+
+      - name: Keep installer as workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: CustomStereoMix-${{ steps.version.outputs.version }}-win-x64
+          path: |
+            artifacts/setup/*.exe
+            artifacts/setup/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./tools/publish_release.ps1 -Tag $env:TAG_NAME -Repository $env:GITHUB_REPOSITORY

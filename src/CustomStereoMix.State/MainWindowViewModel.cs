@@ -15,7 +15,13 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IUiDispatcher _dispatcher;
     private bool _resetting;
     private string _settingsMessage = string.Empty;
-    private string _updateMessage = "업데이트 배포 준비 중입니다.";
+    private string _updateMessage = "GitHub Releases에서 새 버전을 확인할 수 있습니다.";
+    private Task _updateTask = Task.CompletedTask;
+    private CancellationTokenSource? _updateCancellation;
+    private bool _startupUpdatesChecked;
+    private bool _isCheckingUpdates;
+    private bool _isUpdateDialogOpen;
+    private UpdateCheckResult? _updateResult;
     private bool _initialized;
     private bool _shuttingDown;
     private bool _minimizeToTray = true;
@@ -58,7 +64,7 @@ public sealed class MainWindowViewModel : ObservableObject
         StartCommand = new AsyncRelayCommand(StartAsync, () => IsStartEnabled);
         StopCommand = new AsyncRelayCommand(StopAsync, () => IsStopEnabled);
         ResetSettingsCommand = new AsyncRelayCommand(ResetSettingsAsync, () => CanResetSettings);
-        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync);
+        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync, () => !_shuttingDown && !IsCheckingUpdates);
         StartCommand.PropertyChanged += (_, _) => RefreshComputedState();
         StopCommand.PropertyChanged += (_, _) => RefreshComputedState();
         CheckUpdatesCommand.PropertyChanged += (_, _) => OnPropertyChanged(nameof(UpdateButtonText));
@@ -75,7 +81,20 @@ public sealed class MainWindowViewModel : ObservableObject
     public IAsyncRelayCommand ResetSettingsCommand { get; }
     public IAsyncRelayCommand CheckUpdatesCommand { get; }
     public string AppVersion => $"v{typeof(MainWindowViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
-    public string UpdateButtonText => CheckUpdatesCommand.IsRunning ? "확인 중…" : "업데이트 확인";
+    public string UpdateButtonText => IsCheckingUpdates ? "확인 중…" : "업데이트 확인";
+    public bool IsCheckingUpdates
+    {
+        get => _isCheckingUpdates;
+        private set
+        {
+            if (!SetProperty(ref _isCheckingUpdates, value)) return;
+            OnPropertyChanged(nameof(UpdateButtonText));
+            CheckUpdatesCommand.NotifyCanExecuteChanged();
+        }
+    }
+    public UpdateCheckResult? UpdateResult { get => _updateResult; private set => SetProperty(ref _updateResult, value); }
+    public bool IsUpdateDialogOpen { get => _isUpdateDialogOpen; private set => SetProperty(ref _isUpdateDialogOpen, value); }
+    public void DismissUpdate() => IsUpdateDialogOpen = false;
     public string UpdateMessage { get => _updateMessage; private set => SetProperty(ref _updateMessage, value); }
     public string SettingsMessage
     {
@@ -355,10 +374,46 @@ public sealed class MainWindowViewModel : ObservableObject
         RefreshComputedState();
     }
 
-    private async Task CheckUpdatesAsync()
+    public Task CheckUpdatesOnStartupAsync()
     {
-        try { UpdateMessage = (await _updates.CheckAsync()).Message; }
-        catch (Exception ex) { UpdateMessage = $"업데이트 확인 실패: {ex.Message}"; }
+        if (_startupUpdatesChecked || _shuttingDown) return Task.CompletedTask;
+        _startupUpdatesChecked = true;
+        return CheckUpdatesAsync();
+    }
+
+    private Task CheckUpdatesAsync()
+    {
+        if (_shuttingDown) return Task.CompletedTask;
+        if (!_updateTask.IsCompleted) return _updateTask;
+        _updateTask = PerformUpdateCheckAsync();
+        return _updateTask;
+    }
+
+    private async Task PerformUpdateCheckAsync()
+    {
+        using var cancellation = new CancellationTokenSource();
+        _updateCancellation = cancellation;
+        IsCheckingUpdates = true;
+        UpdateMessage = "새 버전을 확인하고 있습니다…";
+        try
+        {
+            var result = await _updates.CheckAsync(cancellation.Token);
+            if (_shuttingDown) return;
+            UpdateResult = result;
+            UpdateMessage = result.Message;
+            IsUpdateDialogOpen = result.State == UpdateCheckState.Available;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            if (!_shuttingDown)
+            {
+                UpdateResult = null;
+                IsUpdateDialogOpen = false;
+                UpdateMessage = $"업데이트 확인 실패: {ex.Message}";
+            }
+        }
+        finally { _updateCancellation = null; IsCheckingUpdates = false; }
     }
 
     private async Task ResetSettingsAsync()
@@ -519,9 +574,11 @@ public sealed class MainWindowViewModel : ObservableObject
     public async Task<bool> ShutdownAsync()
     {
         _shuttingDown = true;
+        _updateCancellation?.Cancel();
         RefreshComputedState();
         try
         {
+            await _updateTask;
             // A pending Start can still be waiting for settings I/O. Finish it
             // before Stop so it cannot open an audio session after shutdown.
             if (StartCommand.ExecutionTask is { IsCompleted: false } starting) await starting;

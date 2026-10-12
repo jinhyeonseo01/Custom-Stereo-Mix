@@ -16,7 +16,6 @@ import {
 import { Icon } from "./icons";
 import type { AppState, Command, Device, Patch, Settings } from "./types";
 
-
 const db = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)} dB`;
 export default function App() {
   const state = useSyncExternalStore(subscribeState, readState);
@@ -176,6 +175,7 @@ export default function App() {
           </>
         )}
       </footer>
+      <UpdateDialog state={state} act={act} />
     </div>
   );
 }
@@ -185,6 +185,64 @@ type Actions = {
   act: (c: Command, p?: unknown) => Promise<boolean>;
   patch: (p: Patch) => Promise<boolean>;
 };
+function UpdateDialog({ state, act }: Pick<Actions, "state" | "act">) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setError("");
+    if (state.isUpdateDialogOpen) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [state.isUpdateDialogOpen]);
+  async function openInstaller() {
+    setOpening(true);
+    const ok = await act("downloadUpdate");
+    setOpening(false);
+    if (ok) await act("dismissUpdate");
+    else
+      setError("설치기 링크를 열지 못했습니다. 설정에서 다시 확인해 주세요.");
+  }
+  return (
+    <dialog
+      ref={dialog}
+      aria-labelledby="update-dialog-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        void act("dismissUpdate");
+      }}
+    >
+      <div className="dialog-body">
+        <h3 id="update-dialog-title">새 업데이트가 있습니다</h3>
+        <p>
+          {state.appVersion} → {state.latestVersion}
+        </p>
+        <p>
+          새 버전의 Windows 설치기를 받을 수 있습니다. 다운로드 후 트레이에서
+          앱을 종료하고 설치기를 실행해 주세요.
+        </p>
+        {state.hasReleasePage && (
+          <button className="button small" onClick={() => act("openRelease")}>
+            <Icon name="external" size={14} />
+            변경 사항 보기
+          </button>
+        )}
+        {error && <p role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button className="button" onClick={() => act("dismissUpdate")}>
+            나중에
+          </button>
+          <button
+            className="button primary"
+            disabled={!state.hasUpdateInstaller || opening}
+            onClick={openInstaller}
+          >
+            {opening ? "여는 중…" : "설치기 다운로드"}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
 function DeviceSelect({
   label,
   icon,
@@ -547,6 +605,12 @@ function SettingsPage({ state, act, patch }: Actions) {
         <p className="caption" role="status">
           {state.updateMessage}
         </p>
+        {state.hasReleasePage && (
+          <button className="button small" onClick={() => act("openRelease")}>
+            <Icon name="external" size={14} />
+            릴리즈 페이지
+          </button>
+        )}
       </section>
       <section className="card settings-card">
         <h3>프로그램 동작</h3>
@@ -779,5 +843,3 @@ function HelpPage() {
     </>
   );
 }
-
-

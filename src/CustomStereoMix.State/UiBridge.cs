@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace CustomStereoMix.State;
 
 /// <summary>Commands and display state only. PCM audio never crosses this bridge.</summary>
-public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWebsite = null)
+public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWebsite = null, Func<Uri, Task>? openUpdateWebsite = null)
 {
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _commands = new(1, 1);
@@ -36,9 +36,12 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         model.StatusText, model.TargetMessage, model.NoticeText, model.IsRouting,
         model.CanEditRoute, model.CanEditSettings, model.IsStartEnabled, model.IsStopEnabled,
         model.CanResetSettings, model.EngineLine, model.TrayHint, model.AppVersion,
-        model.UpdateMessage, model.SettingsMessage,
+        model.UpdateMessage, model.SettingsMessage, model.IsUpdateDialogOpen,
+        latestVersion = model.UpdateResult?.LatestVersion,
+        hasUpdateInstaller = model.UpdateResult?.State == Core.UpdateCheckState.Available && model.UpdateResult.InstallerUrl is not null,
+        hasReleasePage = model.UpdateResult?.ReleasePage is not null,
         busy = model.StartCommand.IsRunning || model.StopCommand.IsRunning || model.ResetSettingsCommand.IsRunning,
-        updating = model.CheckUpdatesCommand.IsRunning,
+        updating = model.IsCheckingUpdates,
         settings = new
         {
             model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
@@ -73,7 +76,14 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "stop": await RunCommand(model.StopCommand); break;
                 case "refresh": await RunCommand(model.RefreshDevicesCommand); break;
                 case "reset": await RunCommand(model.ResetSettingsCommand); break;
-                case "checkUpdates": await RunCommand(model.CheckUpdatesCommand); break;
+                case "checkUpdates":
+                    if (!model.CheckUpdatesCommand.CanExecute(null)) throw new InvalidOperationException("업데이트 확인을 잠시 기다려 주세요.");
+                    // Network I/O must not hold the command gate used by Start/Stop.
+                    _ = model.CheckUpdatesCommand.ExecuteAsync(null);
+                    break;
+                case "dismissUpdate": model.DismissUpdate(); break;
+                case "openRelease": await OpenUpdateLinkAsync(installer: false); break;
+                case "downloadUpdate": await OpenUpdateLinkAsync(installer: true); break;
                 case "patch": ApplyPatch(payload); break;
                 case "openHelp": OpenView("help"); break;
                 case "openSettings": OpenView("settings"); break;
@@ -93,6 +103,14 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
             return new { type = "response", id, ok = false, error = ex.Message, state = Snapshot() };
         }
         finally { _commands.Release(); }
+    }
+
+    private async Task OpenUpdateLinkAsync(bool installer)
+    {
+        var url = installer ? model.UpdateResult?.InstallerUrl : model.UpdateResult?.ReleasePage;
+        if (url is null || openUpdateWebsite is null || !GitHubReleaseUpdateService.IsReleaseLink(url))
+            throw new InvalidOperationException("업데이트 링크를 열 수 없습니다.");
+        await openUpdateWebsite(url);
     }
 
     private static async Task RunCommand(CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command)
