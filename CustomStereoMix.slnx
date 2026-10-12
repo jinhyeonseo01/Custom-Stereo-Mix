@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CustomStereoMix.App/CustomStereoMix.App.csproj" />
+    <Project Path="src/CustomStereoMix.Audio/CustomStereoMix.Audio.csproj" />
+    <Project Path="src/CustomStereoMix.Core/CustomStereoMix.Core.csproj" />
+    <Project Path="src/CustomStereoMix.State/CustomStereoMix.State.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CustomStereoMix.Tests/CustomStereoMix.Tests.csproj" />
+  </Folder>
+</Solution>

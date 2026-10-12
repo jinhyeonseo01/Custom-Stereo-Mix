@@ -1,0 +1,31 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(path.join(root, 'ui', 'package.json'));
+const sharp = require('sharp');
+const source = await readFile(path.join(root, 'ui/node_modules/lucide-static/icons/audio-lines.svg'), 'utf8');
+// Keep the official Lucide artwork; place it on the application's blue tile.
+const artwork = source.slice(source.indexOf('<svg')).replace(/width="24"/, 'x="16" y="16" width="32"').replace(/height="24"/, 'height="32"').replace('currentColor', '#ffffff');
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="17" fill="#416ff2"/>${artwork}</svg>`;
+const sizes = [16, 24, 32, 48, 64, 128, 256];
+const pngs = await Promise.all(sizes.map(size => sharp(Buffer.from(svg)).resize(size, size).png().toBuffer()));
+const header = Buffer.alloc(6 + sizes.length * 16);
+header.writeUInt16LE(1, 2); header.writeUInt16LE(sizes.length, 4);
+let offset = header.length;
+sizes.forEach((size, index) => {
+  const entry = 6 + index * 16;
+  header[entry] = header[entry + 1] = size === 256 ? 0 : size;
+  header.writeUInt16LE(1, entry + 4); header.writeUInt16LE(32, entry + 6);
+  header.writeUInt32LE(pngs[index].length, entry + 8); header.writeUInt32LE(offset, entry + 12);
+  offset += pngs[index].length;
+});
+const ico = Buffer.concat([header, ...pngs]);
+await writeFile(path.join(root, 'src/CustomStereoMix.App/Assets/AppIcon.ico'), ico);
+await writeFile(path.join(root, 'src/CustomStereoMix.App/Assets/AppMark.svg'), svg);
+await writeFile(path.join(root, 'ui/public/favicon.ico'), ico);
+await writeFile(path.join(root, 'ui/public/app-icon.svg'), svg);
+await writeFile(path.join(root, 'ui/public/app-icon.png'), pngs[sizes.indexOf(128)]);
+await writeFile(path.join(root, 'ui/public/LUCIDE-LICENSE.txt'), await readFile(path.join(root, 'ui/node_modules/lucide-react/LICENSE')));
+console.log('Lucide app icon and favicon generated (16–256 px).');

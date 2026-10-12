@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\CustomStereoMix.Core\CustomStereoMix.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" />
+  </ItemGroup>
+</Project>

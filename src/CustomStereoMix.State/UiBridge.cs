@@ -1,0 +1,156 @@
+using System.Text.Json;
+
+namespace CustomStereoMix.State;
+
+/// <summary>Commands and display state only. PCM audio never crosses this bridge.</summary>
+public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWebsite = null)
+{
+    public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly SemaphoreSlim _commands = new(1, 1);
+    private bool _viewInitialized;
+    private string _view = "main";
+    private bool _guideDraft = true;
+    private long _revision;
+    public event EventHandler? Changed;
+
+    public void OpenView(string view)
+    {
+        if (view is not ("main" or "settings" or "help")) throw new ArgumentException("Unknown view.");
+        if (_view == "help" && view != "help") model.SetUsageGuidePreference(_guideDraft);
+        if (view == "help" && _view != "help") _guideDraft = model.DontShowUsageAgain;
+        _view = view;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void CommitGuideOnClose()
+    {
+        if (_view == "help") model.SetUsageGuidePreference(_guideDraft);
+    }
+
+    public JsonElement Snapshot() => JsonSerializer.SerializeToElement(new
+    {
+        revision = Interlocked.Increment(ref _revision), view = _view, guideDraft = _guideDraft,
+        sources = model.Sources, targets = model.Targets, microphones = model.Microphones,
+        sourceDeviceId = model.SelectedSource?.Id, targetDeviceId = model.SelectedTarget?.Id,
+        microphoneDeviceId = model.SelectedMicrophone?.Id,
+        model.StatusText, model.TargetMessage, model.NoticeText, model.IsRouting,
+        model.CanEditRoute, model.CanEditSettings, model.IsStartEnabled, model.IsStopEnabled,
+        model.CanResetSettings, model.EngineLine, model.TrayHint, model.AppVersion,
+        model.UpdateMessage, model.SettingsMessage,
+        busy = model.StartCommand.IsRunning || model.StopCommand.IsRunning || model.ResetSettingsCommand.IsRunning,
+        updating = model.CheckUpdatesCommand.IsRunning,
+        settings = new
+        {
+            model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
+            model.IsMicMixEnabled, model.MicGainDb, model.SampleRate, model.Channels,
+            model.LatencyMilliseconds, model.BufferMilliseconds, model.MinimizeToTray
+        }
+    }, JsonOptions);
+
+    public object Meter() => new { model.LevelPercent, model.SignalState, samples = model.Waveform };
+
+    public async Task<object> HandleAsync(JsonElement message)
+    {
+        string? id = null;
+        await _commands.WaitAsync();
+        try
+        {
+            id = message.GetProperty("id").GetString();
+            if (string.IsNullOrWhiteSpace(id) || id.Length > 80) throw new InvalidOperationException("요청 ID가 올바르지 않습니다.");
+            var command = message.GetProperty("command").GetString();
+            var payload = message.TryGetProperty("payload", out var p) ? p : default;
+            switch (command)
+            {
+                case "ready":
+                    if (!_viewInitialized)
+                    {
+                        _viewInitialized = true;
+                        _view = model.ShouldShowUsageOnStartup ? "help" : "main";
+                        _guideDraft = model.DontShowUsageAgain;
+                    }
+                    break;
+                case "start": await RunCommand(model.StartCommand); break;
+                case "stop": await RunCommand(model.StopCommand); break;
+                case "refresh": await RunCommand(model.RefreshDevicesCommand); break;
+                case "reset": await RunCommand(model.ResetSettingsCommand); break;
+                case "checkUpdates": await RunCommand(model.CheckUpdatesCommand); break;
+                case "patch": ApplyPatch(payload); break;
+                case "openHelp": OpenView("help"); break;
+                case "openSettings": OpenView("settings"); break;
+                case "closeView": OpenView("main"); break;
+                case "guideDraft": _guideDraft = payload.GetProperty("dontShowAgain").GetBoolean(); break;
+                case "openCableWebsite":
+                    if (openCableWebsite is null) throw new InvalidOperationException("설치 페이지를 열 수 없습니다.");
+                    await openCableWebsite();
+                    break;
+                default: throw new InvalidOperationException("지원하지 않는 요청입니다.");
+            }
+            Changed?.Invoke(this, EventArgs.Empty);
+            return new { type = "response", id, ok = true, state = Snapshot() };
+        }
+        catch (Exception ex)
+        {
+            return new { type = "response", id, ok = false, error = ex.Message, state = Snapshot() };
+        }
+        finally { _commands.Release(); }
+    }
+
+    private static async Task RunCommand(CommunityToolkit.Mvvm.Input.IAsyncRelayCommand command)
+    {
+        if (!command.CanExecute(null)) throw new InvalidOperationException("현재 상태에서는 이 동작을 실행할 수 없습니다.");
+        await command.ExecuteAsync(null);
+    }
+
+    private void ApplyPatch(JsonElement payload)
+    {
+        if (!model.CanEditSettings) throw new InvalidOperationException("설정 변경을 잠시 기다려 주세요.");
+        var actions = new List<Action>();
+        foreach (var field in payload.EnumerateObject())
+        {
+            var name = field.Name;
+            var value = field.Value;
+            if (name is "sourceDeviceId" or "targetDeviceId" or "microphoneDeviceId" or "isMicMixEnabled" or
+                "sampleRate" or "channels" or "latencyMilliseconds" or "bufferMilliseconds")
+                if (!model.CanEditRoute) throw new InvalidOperationException("소리 연결을 중지한 뒤 변경해 주세요.");
+            // Validate the complete patch before applying any part of it.
+            switch (name)
+            {
+                case "gainDb": { var n = Number(value, -12, 12); actions.Add(() => model.GainDb = n); break; }
+                case "micGainDb": { var n = Number(value, -12, 12); actions.Add(() => model.MicGainDb = n); break; }
+                case "compressorThresholdDb": { var n = Number(value, -40, -3); actions.Add(() => model.CompressorThresholdDb = n); break; }
+                case "compressorRatio": { var n = Number(value, 1, 10); actions.Add(() => model.CompressorRatio = n); break; }
+                case "sampleRate": { var n = Number(value, 22050, 192000, integer: true); actions.Add(() => model.SampleRate = (decimal)n); break; }
+                case "channels": { var n = Number(value, 1, 2, integer: true); actions.Add(() => model.Channels = (decimal)n); break; }
+                case "latencyMilliseconds": { var n = Number(value, 10, 250, integer: true); actions.Add(() => model.LatencyMilliseconds = (decimal)n); break; }
+                case "bufferMilliseconds": { var n = Number(value, 80, 1000, integer: true); actions.Add(() => model.BufferMilliseconds = (decimal)n); break; }
+                case "compressorEnabled": { var b = value.GetBoolean(); actions.Add(() => model.CompressorEnabled = b); break; }
+                case "isMicMixEnabled": { var b = value.GetBoolean(); actions.Add(() => model.IsMicMixEnabled = b); break; }
+                case "minimizeToTray": { var b = value.GetBoolean(); actions.Add(() => model.MinimizeToTray = b); break; }
+                case "sourceDeviceId": { var d = FindDevice(model.Sources, value); actions.Add(() => model.SelectedSource = d); break; }
+                case "targetDeviceId": { var d = FindDevice(model.Targets, value); actions.Add(() => model.SelectedTarget = d); break; }
+                case "microphoneDeviceId": { var d = FindDevice(model.Microphones, value); actions.Add(() => model.SelectedMicrophone = d); break; }
+                default: throw new InvalidOperationException($"변경할 수 없는 설정: {name}");
+            }
+        }
+        double Proposed(string key, double fallback) => payload.TryGetProperty(key, out var n) ? n.GetDouble() : fallback;
+        Core.AudioSettingsValidator.Validate(new Core.AudioEngineSettings(
+            (int)Proposed("sampleRate", (double)model.SampleRate), (int)Proposed("channels", (double)model.Channels),
+            (int)Proposed("latencyMilliseconds", (double)model.LatencyMilliseconds), (int)Proposed("bufferMilliseconds", (double)model.BufferMilliseconds)),
+            new Core.ProcessingSettings((float)Proposed("gainDb", model.GainDb), model.CompressorEnabled,
+                (float)Proposed("compressorThresholdDb", model.CompressorThresholdDb), (float)Proposed("compressorRatio", model.CompressorRatio)),
+            new Core.MicMixSettings(model.IsMicMixEnabled, (float)Proposed("micGainDb", model.MicGainDb)));
+        foreach (var action in actions) action();
+    }
+
+    private static Core.AudioDeviceDescriptor FindDevice(IEnumerable<Core.AudioDeviceDescriptor> devices, JsonElement value) =>
+        devices.FirstOrDefault(d => string.Equals(d.Id, value.GetString(), StringComparison.OrdinalIgnoreCase))
+        ?? throw new InvalidOperationException("선택한 장치를 찾을 수 없습니다. 장치를 새로고침해 주세요.");
+
+    private static double Number(JsonElement value, double min, double max, bool integer = false)
+    {
+        var n = value.GetDouble();
+        if (!double.IsFinite(n) || n < min || n > max || (integer && n != Math.Truncate(n)))
+            throw new InvalidOperationException($"설정 범위를 확인해 주세요 ({min}–{max}).");
+        return n;
+    }
+}

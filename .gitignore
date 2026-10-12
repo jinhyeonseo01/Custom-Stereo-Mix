@@ -1,0 +1,76 @@
+# .NET build output and restored packages (at any project depth)
+[Bb]in/
+[Oo]bj/
+.nuget/
+[Pp]ackages/
+/artifacts/
+/publish/
+/dist/
+node_modules/
+/ui/dist/
+/output/
+/installer/dependencies/
+/.tools/
+
+# IDE and per-user workspace state
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Tests, coverage and temporary files
+[Tt]est[Rr]esults/
+coverage/
+*.coverage
+*.coveragexml
+.coverage
+.coverage.*
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Local runtime settings, recordings and logs
+/settings.json
+/settings.json.bak
+/recordings/
+/runs/
+*.log
+*.log.*
+
+# Local environment and signing credentials; keep safe templates
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pfx
+*.p12
+*.key
+*.snk
+
+# Legacy Python environment and caches
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Host-specific investigation notes; keep general project documentation
+/docs/AUDIO_REVIEW_*.md
+
+# OS-generated metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
