@@ -162,4 +162,8 @@ dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devi
 
 UI는 React·TypeScript·React Flow, 호스트는 WPF·WebView2, 오디오는 NAudio/WASAPI로 구성합니다. PCM 처리는 C#에서 수행하고 UI에는 명령·상태·미터만 전달합니다.
 
-외부 라이선스는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)와 [licenses](licenses/)에 포함합니다. UI 아이콘은 Material Symbols, 기존 앱 아이콘·favicon은 Lucide를 사용합니다. 가상 드라이버는 각 제작사의 설치·사용·배포 조건을 따릅니다.
+## 라이선스
+
+프로젝트의 자체 코드는 [MIT 라이선스](LICENSE)로 제공합니다. 저작권 표기는 `Copyright (c) 2026 Clrain`입니다.
+
+외부 구성요소는 각자의 라이선스를 유지하며 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)와 [licenses](licenses/)에 포함합니다. UI 아이콘은 Material Symbols, 기존 앱 아이콘·favicon은 Lucide를 사용합니다. 가상 드라이버는 각 제작사의 설치·사용·배포 조건을 따릅니다.

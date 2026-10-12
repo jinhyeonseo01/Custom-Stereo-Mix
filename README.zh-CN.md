@@ -159,4 +159,8 @@ dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devi
 
 UI使用React、TypeScript、React Flow，宿主使用WPF、WebView2，音频使用NAudio/WASAPI。PCM在C#处理，桥接仅传递命令、状态和电平。
 
-第三方许可见[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)及[licenses](licenses/)。UI图标使用Material Symbols，现有应用图标/favicon使用Lucide。虚拟驱动遵循各厂商的安装、使用和分发条款。
+## 许可证
+
+项目原创代码采用[MIT License](LICENSE)。Copyright (c) 2026 Clrain.
+
+第三方组件保留各自许可，声明见[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)及[licenses](licenses/)。UI图标使用Material Symbols，现有应用图标/favicon使用Lucide。虚拟驱动遵循各厂商的安装、使用和分发条款。

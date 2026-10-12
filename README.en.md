@@ -162,4 +162,8 @@ For issues, include app/Windows versions, device names, steps and node errors. R
 
 React/TypeScript/React Flow provide the UI; WPF/WebView2 host it; NAudio/WASAPI process PCM in C#. Only commands, state and meters cross the UI bridge.
 
-Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [licenses](licenses/). UI icons use Material Symbols; existing app icons/favicon use Lucide. Virtual drivers follow their vendors' installation, usage and distribution terms.
+## License
+
+Original project code is available under the [MIT License](LICENSE). Copyright (c) 2026 Clrain.
+
+Third-party components retain their own licenses. Notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [licenses](licenses/). UI icons use Material Symbols; existing app icons/favicon use Lucide. Virtual drivers follow their vendors' installation, usage and distribution terms.

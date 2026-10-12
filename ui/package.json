@@ -1,6 +1,7 @@
 {
   "name": "custom-stereo-mix-ui",
   "private": true,
+  "license": "MIT",
   "version": "2.0.0",
   "type": "module",
   "scripts": {

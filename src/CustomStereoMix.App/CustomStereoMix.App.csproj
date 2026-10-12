@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
+    <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="..\..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <FrontendInputs Include="..\..\ui\src\**\*;..\..\ui\public\**\*;..\..\ui\index.html;..\..\ui\package.json;..\..\ui\package-lock.json;..\..\ui\tsconfig.json;..\..\ui\vite.config.ts" />
