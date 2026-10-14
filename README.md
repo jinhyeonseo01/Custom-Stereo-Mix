@@ -10,7 +10,7 @@
 
 Custom Stereo Mix는 **PC 재생음과 마이크·가상 입력을 혼합하고 여러 출력 장치로 전달하는 Windows 앱**입니다. 간편모드에서는 재생 소리와 보낼 장치를 선택하고, 고급모드에서는 노드와 간선으로 여러 믹스를 구성합니다. 가상 오디오 케이블을 출력으로 사용하면 Discord·OBS·녹음·STT 앱에서 혼합된 소리를 입력으로 받을 수 있습니다.
 
-이 README는 **2.0.2 소스 기준**입니다. 검증한 동작과 남은 안정화 항목은 [검증 기록](docs/VALIDATION.md)에 있습니다.
+이 README는 **2.0.3 소스 기준**입니다. 검증한 동작과 남은 안정화 항목은 [검증 기록](docs/VALIDATION.md)에 있습니다.
 
 ## 주요 기능
 
@@ -121,7 +121,7 @@ C# 빌드에 npm 복원과 React 프로덕션 빌드가 연결되어 있습니�
 | 작업 | 명령 | 결과 |
 |---|---|---|
 | 폴더 배포 | `.\build_exe.ps1` | `artifacts\webview2\` |
-| 설치기 | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.2-Setup-x64.exe` |
+| 설치기 | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.3-Setup-x64.exe` |
 
 설치기 생성에는 Inno Setup 7이 필요합니다. 다른 경로라면 `-IsccPath 'C:\경로\ISCC.exe'`를 지정합니다. 버전은 `Directory.Build.props`에서 관리합니다. 앱 아이콘 원본을 바꿨을 때만 `-RegenerateIcons`를 사용합니다. 태그 기반 자동 배포와 업데이트 동작은 [릴리즈 안내](docs/RELEASING.md)에 있습니다.
 

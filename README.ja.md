@@ -10,7 +10,7 @@
 
 Custom Stereo Mixは、**PCの再生音・マイク・仮想入力を混合し、複数の出力デバイスへ送るWindowsアプリ**です。簡易モードでは再生元と送信先を選択し、詳細モードではノードと接続線で複数のミックスを構成します。仮想ケーブルを使えばDiscord・OBS・録音・STTアプリの入力へ送信できます。
 
-このREADMEは**2.0.2のソース**を対象としています。実施した検証と未完了の安定性試験は[検証記録](docs/VALIDATION.md)に記載しています。
+このREADMEは**2.0.3のソース**を対象としています。実施した検証と未完了の安定性試験は[検証記録](docs/VALIDATION.md)に記載しています。
 
 ## 主な機能
 
@@ -118,7 +118,7 @@ C#ビルドがnpmの復元とReactビルドも実行します。
 | 作業 | コマンド | 出力 |
 |---|---|---|
 | フォルダー配布 | `.\build_exe.ps1` | `artifacts\webview2\` |
-| インストーラー | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.2-Setup-x64.exe` |
+| インストーラー | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.3-Setup-x64.exe` |
 
 インストーラーにはInno Setup 7が必要です。別の場所にある場合は `-IsccPath 'C:\path\ISCC.exe'` を指定します。バージョンは `Directory.Build.props` で管理します。アプリアイコンの原本を変更した場合だけ `-RegenerateIcons` を使います。自動配布は[リリース案内](docs/RELEASING.md)を参照してください。
 

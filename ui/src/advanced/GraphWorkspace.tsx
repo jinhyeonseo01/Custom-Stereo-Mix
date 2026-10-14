@@ -103,6 +103,7 @@ function Workspace({ state, onPendingChange, initialNodeId, onSelectedBus }: { s
   const [pinned, setPinned] = useState(false);
   const [dockHeight, setDockHeight] = useState(240);
   const [compactLayout, setCompactLayout] = useState(() => matchMedia("(max-height: 850px), (max-width: 1100px)").matches);
+  const [narrowMinimap, setNarrowMinimap] = useState(() => matchMedia("(max-width: 760px)").matches);
   const [mixId, setMixId] = useState(state.simpleBusId ?? state.graph.nodes.find(n => n.kind === "bus")?.id ?? "");
   const [flowNodes, setFlowNodes] = useState<FlowNode[]>([]);
   const flow = useReactFlow<FlowNode>();
@@ -154,6 +155,11 @@ function Workspace({ state, onPendingChange, initialNodeId, onSelectedBus }: { s
   useEffect(() => {
     const query = matchMedia("(max-height: 850px), (max-width: 1100px)");
     const change = () => setCompactLayout(query.matches); query.addEventListener("change", change);
+    return () => query.removeEventListener("change", change);
+  }, []);
+  useEffect(() => {
+    const query = matchMedia("(max-width: 760px)");
+    const change = () => setNarrowMinimap(query.matches); query.addEventListener("change", change);
     return () => query.removeEventListener("change", change);
   }, []);
   useEffect(() => { if (compactLayout && dock && inspector) setDock(false); }, [compactLayout, dock, inspector]);
@@ -361,7 +367,9 @@ function Workspace({ state, onPendingChange, initialNodeId, onSelectedBus }: { s
           onEdgeClick={(_, edge) => { closeMenu(); setSelectedEdge(edge.id); setSelected(null); setInspector(true); if (compactLayout) { setDock(false); setLibrary(false); setAddOpen(false); } }}
           onPaneClick={() => { closeMenu(); setSelected(null); setSelectedEdge(null); setInspector(false); }}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#ccddef" />
-          <MiniMap<FlowNode> nodeColor={n => !n.data.node.enabled ? "#aab3bf" : n.data.node.muted ? "#edd5ac" : n.data.node.kind === "capture" ? "#bfeade" : n.data.node.kind === "output" ? "#dacffe" : "#c6d9fb"} pannable zoomable />
+          {/* MiniMap uses numeric style dimensions to size its SVG and calculate pan/zoom. */}
+          <MiniMap<FlowNode> position="bottom-left" style={{ width: narrowMinimap ? 140 : 220, height: narrowMinimap ? 80 : 116 }}
+            nodeColor={n => !n.data.node.enabled ? "#aab3bf" : n.data.node.muted ? "#edd5ac" : n.data.node.kind === "capture" ? "#bfeade" : n.data.node.kind === "output" ? "#dacffe" : "#c6d9fb"} pannable zoomable />
         </ReactFlow>
         {!project.nodes.length && <p className="graph-empty">{t("GraphEmpty")}</p>}
         <div className="graph-hint">{t(zoom < .8 ? "GraphCompactHint" : state.isRouting ? "GraphStopEdit" : "GraphConnectHint")}</div>

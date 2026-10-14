@@ -10,7 +10,7 @@
 
 Custom Stereo Mix是一款**将PC播放音频、麦克风和虚拟输入混合后发送到多个输出设备的Windows应用**。简易模式保留播放转发与麦克风控制，高级模式通过节点和连接线配置多个混音组。使用虚拟音频线时，Discord、OBS、录音或STT应用可将混音作为输入。
 
-本README针对**2.0.2源码版本**。已完成检查和剩余稳定性验证见[验证记录](docs/VALIDATION.md)。
+本README针对**2.0.3源码版本**。已完成检查和剩余稳定性验证见[验证记录](docs/VALIDATION.md)。
 
 ## 主要功能
 
@@ -118,7 +118,7 @@ C#构建自动执行npm恢复和React构建。
 | 任务 | 命令 | 产物 |
 |---|---|---|
 | 文件夹分发 | `.\build_exe.ps1` | `artifacts\webview2\` |
-| 安装包 | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.2-Setup-x64.exe` |
+| 安装包 | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.3-Setup-x64.exe` |
 
 安装包需要Inno Setup 7。自定义路径使用 `-IsccPath 'C:\path\ISCC.exe'`。默认版本位于 `Directory.Build.props`。仅修改应用图标源文件时使用 `-RegenerateIcons`。自动发布见[发布指南](docs/RELEASING.md)。
 

@@ -10,7 +10,7 @@
 
 Custom Stereo Mix is a Windows app for **mixing playback loopbacks, microphones and virtual capture inputs into multiple output devices**. Simple mode keeps everyday playback routing and microphone controls. Advanced mode lets you connect several mixes with nodes and edges. With a virtual audio cable, Discord, OBS, recording or STT apps can receive a mix as an input.
 
-This README describes the **2.0.2 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
+This README describes the **2.0.3 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
 
 ## Features
 
@@ -121,7 +121,7 @@ The C# build restores npm dependencies and builds the React frontend.
 | Task | Command | Output |
 |---|---|---|
 | Folder distribution | `.\build_exe.ps1` | `artifacts\webview2\` |
-| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.2-Setup-x64.exe` |
+| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.3-Setup-x64.exe` |
 
 Installer builds require Inno Setup 7. Pass `-IsccPath 'C:\path\ISCC.exe'` for a custom location. The default version lives in `Directory.Build.props`. Use `-RegenerateIcons` only when changing app-icon sources. See [release documentation](docs/RELEASING.md) for tagged releases and updates.
 
