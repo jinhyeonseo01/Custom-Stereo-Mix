@@ -20,6 +20,7 @@ export interface Settings {
   latencyMilliseconds: number;
   bufferMilliseconds: number;
   minimizeToTray: boolean;
+  closeToTray: boolean;
 }
 export interface AppState {
   graph: GraphProject;

@@ -29,7 +29,15 @@ export function NodeContextMenu({ node, anchor, canEditRoute, change, inspect, r
   return createPortal(<div ref={menu} className="node-context-menu" role="menu" aria-label={t("GraphNodeActions") + " · " + nodeName(node)} style={{ left: position.x, top: position.y }}
     onContextMenu={e => e.preventDefault()} onKeyDown={e => {
       e.stopPropagation();
-      if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); dismiss(true); }
+      if (e.key === "Escape") { e.preventDefault(); dismiss(true); }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const controls = Array.from(document.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]'))
+          .filter(el => !menu.current?.contains(el) && el.getClientRects().length && el.tabIndex >= 0);
+        const index = controls.indexOf(anchor.trigger);
+        const next = controls[index + (e.shiftKey ? -1 : 1)] ?? anchor.trigger;
+        dismiss(); next.focus({ preventScroll: true });
+      }
       if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
         e.preventDefault(); const items = Array.from(menu.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
         const current = items.indexOf(document.activeElement as HTMLButtonElement);

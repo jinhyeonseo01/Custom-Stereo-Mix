@@ -63,7 +63,7 @@ public partial class MainWindow : Window
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(MenuItem(MessageKey.Exit, async (_, _) => await ExitAsync()));
         using var stream = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/CustomStereoMix.App;component/Assets/AppIcon.ico"))!.Stream;
-        _tray = new Forms.NotifyIcon { Icon = new System.Drawing.Icon(stream), ContextMenuStrip = menu, Text = "Custom Stereo Mix", Visible = model.MinimizeToTray };
+        _tray = new Forms.NotifyIcon { Icon = new System.Drawing.Icon(stream), ContextMenuStrip = menu, Text = "Custom Stereo Mix", Visible = model.MinimizeToTray || model.CloseToTray };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) RestoreWindow(); };
         _model.PropertyChanged += ModelChanged;
         _model.UpdateReady += OnUpdateReady;
@@ -275,11 +275,11 @@ public partial class MainWindow : Window
         RetryButton.Content = _model.Text(MessageKey.Retry);
         RuntimeButton.Content = _model.Text(MessageKey.RuntimeGuide);
         _meterDirty = true;
-        _tray.Visible = _model.MinimizeToTray && !_shutdownComplete;
+        _tray.Visible = (_model.MinimizeToTray || _model.CloseToTray) && !_shutdownComplete;
         _tray.Text = $"Custom Stereo Mix · {_model.StatusText}";
         _startItem.Enabled = _model.IsStartEnabled;
         _stopItem.Enabled = _model.IsStopEnabled;
-        if (!_model.MinimizeToTray && !IsVisible && _modelInitialized && !_exiting) RestoreWindow();
+        if (!_model.MinimizeToTray && !_model.CloseToTray && !IsVisible && _modelInitialized && !_exiting) RestoreWindow();
     }
 
     private async Task RunTrayCommand(string command)
@@ -306,7 +306,7 @@ public partial class MainWindow : Window
         if (_shutdownComplete) return;
         e.Cancel = true;
         if (_exiting) return;
-        if (_model.MinimizeToTray && _tray.Visible) HideToTray();
+        if (_model.CloseToTray && _tray.Visible) HideToTray();
         else await ExitAsync();
     }
 

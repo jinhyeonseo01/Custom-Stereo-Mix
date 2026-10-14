@@ -31,6 +31,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _initialized;
     private bool _shuttingDown;
     private bool _minimizeToTray = true;
+    private bool _closeToTray = true;
     private bool? _hideUsageOnStartup;
     private LocalizedMessage _noticeText = LocalizedMessage.Empty;
     private AppSettings _loadedSettings = new();
@@ -394,7 +395,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get => _minimizeToTray;
         set { if (SetProperty(ref _minimizeToTray, value)) { OnPropertyChanged(nameof(TrayHint)); ScheduleSave(); } }
     }
-    public string TrayHint => Text(MinimizeToTray ? MessageKey.TrayContinues : MessageKey.CloseExits);
+    public bool CloseToTray
+    {
+        get => _closeToTray;
+        set { if (SetProperty(ref _closeToTray, value)) { OnPropertyChanged(nameof(TrayHint)); ScheduleSave(); } }
+    }
+    public string TrayHint => Text((CloseToTray, MinimizeToTray) switch
+    {
+        (true, true) => MessageKey.TrayContinues,
+        (true, false) => MessageKey.TrayCloseOnly,
+        (false, true) => MessageKey.TrayMinimizeOnly,
+        _ => MessageKey.CloseExits
+    });
     public string NoticeText => _localizer.Render(_noticeText);
     private LocalizedMessage Notice
     {
@@ -661,6 +673,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             TargetDeviceId = SelectedTarget?.Id,
             MicrophoneDeviceId = SelectedMicrophone?.Id,
             MinimizeToTray = MinimizeToTray,
+            CloseToTray = CloseToTray,
             HideUsageOnStartup = _hideUsageOnStartup,
             Processing = CurrentProcessing(),
             Microphone = CurrentMicrophone(),
@@ -735,6 +748,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _simpleBusId = settings.SimpleBusId;
         Language = LanguageCatalog.Resolve(settings.Language, _initialLanguage);
         MinimizeToTray = settings.MinimizeToTray;
+        CloseToTray = settings.CloseToTray ?? settings.MinimizeToTray;
         _hideUsageOnStartup = settings.HideUsageOnStartup;
         OnPropertyChanged(nameof(ShouldShowUsageOnStartup));
         OnPropertyChanged(nameof(DontShowUsageAgain));

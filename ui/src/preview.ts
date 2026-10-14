@@ -15,7 +15,11 @@ const defaults: Settings = {
   latencyMilliseconds: 50,
   bufferMilliseconds: 250,
   minimizeToTray: true,
+  closeToTray: true,
 };
+function trayHint(settings: Settings): MessageKey {
+  return settings.closeToTray ? settings.minimizeToTray ? "TrayContinues" : "TrayCloseOnly" : settings.minimizeToTray ? "TrayMinimizeOnly" : "CloseExits";
+}
 export function createPreviewBridge(): WebViewBridge {
   const listeners = new Set<(e: MessageEvent) => void>();
   const stress = new URLSearchParams(location.search).has("stress");
@@ -83,7 +87,7 @@ export function createPreviewBridge(): WebViewBridge {
     canResetSettings: true,
     engineLine: "48 kHz · 스테레오",
     trayHint: "TrayContinues",
-    appVersion: "v2.0.1",
+    appVersion: "v2.0.2",
     updateMessage: "UpdateUnconfigured",
     isUpdateDialogOpen: false,
   isDownloadingUpdate: false,
@@ -178,9 +182,7 @@ export function createPreviewBridge(): WebViewBridge {
           ] as const)
             if (key in payload) state[key] = String(payload[key]);
           state.engineLine = `${state.settings.sampleRate / 1000} kHz · ${state.settings.channels === 1 ? "Mono" : "Stereo"}`;
-          state.trayHint = state.settings.minimizeToTray
-            ? "TrayContinues"
-            : "CloseExits";
+          state.trayHint = trayHint(state.settings);
           break;
         }
         case "reset":
@@ -224,9 +226,7 @@ export function createPreviewBridge(): WebViewBridge {
         state.settings.sampleRate / 1000,
         t(state.settings.channels === 1 ? "Mono" : "Stereo"),
       );
-      snapshot.trayHint = t(
-        state.settings.minimizeToTray ? "TrayContinues" : "CloseExits",
-      );
+      snapshot.trayHint = t(trayHint(state.settings));
       for (const devices of [
         snapshot.sources,
         snapshot.targets,

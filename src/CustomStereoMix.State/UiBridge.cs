@@ -52,7 +52,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
         {
             model.Language, model.StartWithWindows, model.GainDb, model.CompressorEnabled, model.CompressorThresholdDb, model.CompressorRatio,
             model.IsMicMixEnabled, model.MicGainDb, model.SampleRate, model.Channels,
-            model.LatencyMilliseconds, model.BufferMilliseconds, model.MinimizeToTray
+            model.LatencyMilliseconds, model.BufferMilliseconds, model.MinimizeToTray, model.CloseToTray
         }
     }, JsonOptions);
 
@@ -176,6 +176,7 @@ public sealed class UiBridge(MainWindowViewModel model, Func<Task>? openCableWeb
                 case "compressorEnabled": { var b = value.GetBoolean(); actions.Add(() => model.CompressorEnabled = b); break; }
                 case "isMicMixEnabled": { var b = value.GetBoolean(); actions.Add(() => model.IsMicMixEnabled = b); break; }
                 case "minimizeToTray": { var b = value.GetBoolean(); actions.Add(() => model.MinimizeToTray = b); break; }
+                case "closeToTray": { var b = value.GetBoolean(); actions.Add(() => model.CloseToTray = b); break; }
                 case "startWithWindows": { var b = value.GetBoolean(); actions.Add(() => model.StartWithWindows = b); break; }
                 case "sourceDeviceId": { var d = FindDevice(model.Sources, value); actions.Add(() => model.SelectedSource = d); break; }
                 case "targetDeviceId": { var d = FindDevice(model.Targets, value); actions.Add(() => model.SelectedTarget = d); break; }

@@ -5,6 +5,28 @@ using CustomStereoMix.State;
 
 static class GraphTests
 {
+    public static void IndependentTrayPreferences() => RunTrayPreferences().GetAwaiter().GetResult();
+    static async Task RunTrayPreferences()
+    {
+        foreach (var legacy in new[] { true, false })
+        {
+            var store = new MemoryGraphSettings { Value = new AppSettings { MinimizeToTray = legacy } };
+            var model = new MainWindowViewModel(new FakeDevices(), new TestGraphRouter(), store);
+            await model.InitializeAsync();
+            Check(model.CloseToTray == legacy && model.MinimizeToTray == legacy, "Legacy tray behavior changed.");
+            var bridge = new UiBridge(model);
+            var response = JsonSerializer.SerializeToElement(await bridge.HandleAsync(JsonSerializer.SerializeToElement(new { id = "tray-patch", command = "patch", payload = new { closeToTray = !legacy } })));
+            Check(response.GetProperty("ok").GetBoolean() && model.CloseToTray == !legacy && model.MinimizeToTray == legacy, "Close preference changed minimize behavior.");
+            Check(bridge.Snapshot().GetProperty("settings").GetProperty("closeToTray").GetBoolean() == !legacy, "Bridge omitted close preference.");
+            await model.ShutdownAsync();
+            var restored = new MainWindowViewModel(new FakeDevices(), new TestGraphRouter(), store);
+            await restored.InitializeAsync();
+            Check(restored.CloseToTray == !legacy && restored.MinimizeToTray == legacy, "Independent tray preferences were lost after reload.");
+            await restored.ResetSettingsCommand.ExecuteAsync(null);
+            Check(restored.CloseToTray && restored.MinimizeToTray, "Reset did not restore tray defaults.");
+            await restored.ShutdownAsync();
+        }
+    }
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static AudioNodeConfig N(string id, string kind, string? device = null) => new() { Id = id, Kind = kind, DeviceId = device };
     static AudioEdgeConfig E(string s, string t, float gain = 0) => new() { Id = s + "-" + t, Source = s, Target = t, GainDb = gain };

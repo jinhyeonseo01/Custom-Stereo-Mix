@@ -1,4 +1,4 @@
-import { t, languages } from "./i18n";
+import { t } from "./i18n";
 import React, {
   useEffect,
   useId,
@@ -14,18 +14,29 @@ import {
   readState,
 } from "./bridge";
 import { Icon } from "./icons";
-import type { AppState, Command, Device, Patch, Settings } from "./types";
+import type { AppState, Command, Device, Patch } from "./types";
 import { Gain, GainValue, NodeMeter } from "./advanced/AudioControls";
+import { InspectorToggle } from "./advanced/InspectorToggle";
+import { NodeRuntimeBadge, RouteDiagnostics } from "./advanced/RouteDiagnostics";
+import { SettingsPage } from "./SettingsPage";
 import "./advanced/advanced.css";
-import { nodeName, createNode, graphError } from "./advanced/graph";
+import { nodeName, createNode, graphError, activeNodeIds } from "./advanced/graph";
 
-const db = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)} dB`;
 const GraphWorkspace = React.lazy(() => import("./advanced/GraphWorkspace").then(module => ({ default: module.GraphWorkspace })));
 export default function App() {
   const state = useSyncExternalStore(subscribeState, readState);
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(true);
   const [graphPending, setGraphPending] = useState(false);
+  const [inspectNodeId, setInspectNodeId] = useState<string | null>(null);
+  const [graphBusId, setGraphBusId] = useState<string | null>(null);
+  async function inspectNode(id: string) { setInspectNodeId(id); await act("mode", { advanced: true }); }
+  async function changeMode(advanced: boolean) {
+    setInspectNodeId(null);
+    if (!advanced && graphBusId && state?.graph.nodes.some(n => n.id === graphBusId && n.kind === "bus"))
+      if (!await act("simpleBus", { id: graphBusId })) return;
+    await act("mode", { advanced });
+  }
   useEffect(() => {
     connect()
       .catch((e) => setError(e.message))
@@ -68,7 +79,7 @@ export default function App() {
           </div>
         </div>
         <label className="mode-switch"><input type="checkbox" role="switch" checked={state.advancedMode}
-          disabled={state.busy || graphPending} onChange={e => act("mode", { advanced: e.target.checked })} />
+          disabled={state.busy || graphPending} onChange={e => void changeMode(e.target.checked)} />
           <span className="switch-visual" aria-hidden="true" /><span>{t("AdvancedMode")}</span></label>
         <nav className="header-actions" aria-label={t("AppMenu")}>
           <span
@@ -106,7 +117,7 @@ export default function App() {
       )}
       {state.advancedMode && (error || state.noticeText) && <div className="notice graph-error" role="alert"><span>{error || state.noticeText}</span>
         {error && <button className="icon-button" aria-label={t("DismissError")} onClick={() => setError("")}><Icon name="close" /></button>}</div>}
-      {state.advancedMode ? <React.Suspense fallback={<main className="loading"><p>{t("Working")}</p></main>}><GraphWorkspace state={state} onPendingChange={setGraphPending} /></React.Suspense> : <main className="page-scroll">
+      {state.advancedMode ? <React.Suspense fallback={<main className="loading"><p>{t("Working")}</p></main>}><GraphWorkspace state={state} onPendingChange={setGraphPending} initialNodeId={inspectNodeId} onSelectedBus={setGraphBusId} /></React.Suspense> : <main className="page-scroll">
         <div className="page-content">
           {(error || state.noticeText) && (
             <div className="notice" role="alert">
@@ -122,16 +133,16 @@ export default function App() {
               )}
             </div>
           )}
-          <SimpleGraphPage state={state} act={act} onPendingChange={setGraphPending} />
+          <SimpleGraphPage state={state} act={act} onPendingChange={setGraphPending} inspectNode={inspectNode} />
         </div>
       </main>}
       <footer className="app-footer">
-        <div className="footer-copy"><strong>{state.engineLine}{state.advancedMode && " · " + t("GraphConfiguredLatency") + " " + state.settings.latencyMilliseconds + " ms"}</strong><span>{state.trayHint}</span></div>
+        <div className="footer-copy"><strong>{state.engineLine}{state.advancedMode && " · " + t("GraphConfiguredLatency") + " " + state.settings.latencyMilliseconds + " ms"}</strong><span>{t("GraphAllMixesAction")} · {state.trayHint}</span></div>
         <button className={`button route-action ${state.isRouting ? "danger" : "primary"}`}
           disabled={state.busy || (!state.isRouting && graphPending) || (state.isRouting ? !state.isStopEnabled : !state.isStartEnabled)}
           onClick={() => act(state.isRouting ? "stop" : "start")}>
           <Icon name={state.isRouting ? "stop" : "play"} size={17} />
-          {t(state.busy ? "Working" : state.advancedMode ? state.isRouting ? "GraphStopAll" : "GraphStartAll" : state.isRouting ? "StopRouting" : "StartRouting")}
+          {t(state.busy ? "Working" : state.isRouting ? "GraphStopAll" : "GraphStartAll")}
         </button>
       </footer>
       <PanelDialog state={state} act={act} patch={patch} error={error} />
@@ -145,7 +156,7 @@ type Actions = {
   act: (c: Command, p?: unknown) => Promise<boolean>;
   patch: (p: Patch) => Promise<boolean>;
 };
-function SimpleGraphPage({ state, act, onPendingChange }: Pick<Actions, "state" | "act"> & { onPendingChange: (pending: boolean) => void }) {
+function SimpleGraphPage({ state, act, onPendingChange, inspectNode }: Pick<Actions, "state" | "act"> & { onPendingChange: (pending: boolean) => void; inspectNode: (id: string) => void }) {
   const bus = state.graph.nodes.find(n => n.id === state.simpleBusId && n.kind === "bus") ?? state.graph.nodes.find(n => n.kind === "bus");
   const draft = useRef(state.graph), queued = useRef<typeof state.graph | null>(null), sending = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,6 +187,8 @@ function SimpleGraphPage({ state, act, onPendingChange }: Pick<Actions, "state" 
   const target = local.nodes.find(n => n.id === outputs[0]?.target);
   const mic = local.nodes.find(n => n.id === (micEdge?.source ?? current.preferredMicrophoneId)) ?? local.nodes.find(n => n.kind === "capture");
   const change = (patch: Partial<typeof current>) => update({ ...draft.current, nodes: draft.current.nodes.map(n => n.id === current.id ? { ...n, ...patch } : n) });
+  const changeNode = (id: string, patch: Partial<typeof current>) => update({ ...draft.current, nodes: draft.current.nodes.map(n => n.id === id ? { ...n, ...patch } : n) });
+  const changeEdge = (id: string, patch: Partial<import("./types").AudioEdgeConfig>) => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === id ? { ...e, ...patch } : e) });
   const choose = (kind: "loopback" | "capture" | "output", deviceId: string, enabled = true) => {
     if (!state.canEditRoute) return;
     const graph = draft.current;
@@ -200,21 +213,27 @@ function SimpleGraphPage({ state, act, onPendingChange }: Pick<Actions, "state" 
       {local.nodes.filter(n => n.kind === "bus").length > 1 && <select className="simple-mix-picker" aria-label={t("MixBus")} value={current.id}
         onChange={e => act("simpleBus", { id: e.target.value })}>{local.nodes.filter(n => n.kind === "bus").map(n => <option key={n.id} value={n.id}>{nodeName(n)}</option>)}</select>}
       <button className="button small" disabled={!state.canEditRoute} onClick={() => act("refresh")}><Icon name="refresh" size={14} />{t("Refresh")}</button></div>
+    <section className="card simple-state-card"><div className="simple-state-heading"><div><strong>{nodeName(current)}</strong><span className="node-state-badge">{t(current.enabled ? "GraphNodeActive" : "GraphNodeInactive")}</span><NodeRuntimeBadge node={current} active={activeNodeIds(local).has(current.id)} running={state.isRouting} /></div>
+      <div className="simple-state-controls"><InspectorToggle primary label={t("GraphActivation")} hint={t(!state.canEditRoute ? "GraphEnableLocked" : current.enabled ? "GraphEnableHint" : "GraphDisableHint")} checked={current.enabled} disabled={!state.canEditRoute} onChange={enabled => change({ enabled })} />
+      <div className="inspector-mute"><InspectorToggle label={t("Mute")} hint={t("GraphMuteHint")} checked={current.muted} onChange={muted => change({ muted })} /></div></div></div>
+      <NodeMeter id={current.id} detailed silent={!activeNodeIds(local).has(current.id) || current.muted} label={nodeName(current) + " · " + t("SignalLevel")} />
+    </section>
+    <RouteDiagnostics node={current} project={local} state={state} changeNode={changeNode} changeEdge={changeEdge} inspect={inspectNode} />
     <div className="route-grid"><section className="card"><DeviceSelect label={t("PlaybackSource")} icon="speaker" devices={state.sources}
-      selected={source?.deviceId ?? null} disabled={!state.canEditRoute} onChange={id => choose("loopback", id)} /></section>
+      selected={source?.deviceId ?? null} optional disabled={!state.canEditRoute} onChange={id => id ? choose("loopback", id) : update({ ...draft.current, edges: draft.current.edges.filter(e => e.id !== sourceEdge?.id) })} /></section>
       <span className="route-arrow" aria-hidden="true">→</span><section className="card"><DeviceSelect label={t("OutputTarget")} icon="cable" devices={state.targets}
       selected={target?.deviceId ?? null} disabled={!state.canEditRoute} onChange={id => choose("output", id)} /></section></div>
     <p className="caption route-help">{t("CableInputHint")}</p>
     {(inputs.length > Number(!!sourceEdge) + Number(!!micEdge) || outputs.length > 1) && <p className="caption">{t("GraphAdditionalRoutes", Math.max(0, inputs.length - Number(!!sourceEdge) - Number(!!micEdge)), Math.max(0, outputs.length - 1))}</p>}
-    <section className="card signal-card"><div className="signal-heading"><strong>{nodeName(current)} · {t("SignalMonitor")}</strong></div><div className="simple-node-meter"><NodeMeter id={current.id} /></div></section>
-    <div className="gain-row"><span className="field-title">{t("OutputGain")}</span><Gain value={current.gainDb} label={t("OutputGain")} onChange={gainDb => change({ gainDb })} /><GainValue value={current.gainDb} label={t("GraphGainValue")} onChange={gainDb => change({ gainDb })} /></div>
-    <section className="card mic-card"><Switch label={t("IncludeMicrophone")} icon="mic" value={micEnabled} disabled={!state.canEditRoute || !state.microphones.length}
+    <div className="gain-row"><span className="field-title">{t("OutputGain")}</span><Gain value={current.gainDb} label={t("OutputGain")} showRange onChange={gainDb => change({ gainDb })} /><GainValue value={current.gainDb} label={t("GraphGainValue")} onChange={gainDb => change({ gainDb })} /></div>
+    <section className="card mic-card"><div className="mic-heading"><Switch label={t("IncludeMicrophone")} icon="mic" value={micEnabled} disabled={!state.canEditRoute || !state.microphones.length}
       onChange={enabled => { if (enabled) { const id = mic?.deviceId ?? state.microphones.find(d => d.isDefault)?.id ?? state.microphones[0]?.id; if (id) choose("capture", id); }
         else update({ ...draft.current, nodes: draft.current.nodes.map(n => n.id === current.id ? { ...n, preferredMicrophoneId: mic?.id, preferredMicrophoneGainDb: micEdge?.gainDb ?? 0 } : n), edges: draft.current.edges.filter(e => e.id !== micEdge?.id) }); }} />
+      {micEnabled && <div className="inspector-mute"><InspectorToggle label={t("Microphone") + " · " + t("Mute")} hint={t("GraphMuteHint")} checked={micEdge!.muted} onChange={muted => changeEdge(micEdge!.id, { muted })} /></div>}</div>
       {micEnabled && <div className="mic-details"><DeviceSelect label={t("Microphone")} icon="mic" devices={state.microphones} selected={mic?.deviceId ?? null}
-        disabled={!state.canEditRoute} onChange={id => choose("capture", id)} /><div className="gain-row"><Gain value={micEdge!.gainDb} label={t("MicrophoneGain")}
+        disabled={!state.canEditRoute} onChange={id => choose("capture", id)} /><div className="mic-gain"><span className="field-title">{t("MicrophoneGain")}</span><div className="gain-row"><Gain value={micEdge!.gainDb} label={t("MicrophoneGain")}
           onChange={gainDb => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === micEdge!.id ? { ...e, gainDb } : e) })} />
-          <GainValue value={micEdge!.gainDb} label={t("MicrophoneGain")} onChange={gainDb => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === micEdge!.id ? { ...e, gainDb } : e) })} /></div></div>}
+          <GainValue value={micEdge!.gainDb} label={t("MicrophoneGain")} onChange={gainDb => update({ ...draft.current, edges: draft.current.edges.map(e => e.id === micEdge!.id ? { ...e, gainDb } : e) })} /></div></div></div>}
     </section>
     {local.nodes.filter(n => n.kind === "bus").length > 1 && <p className="caption">{t("GraphRunningOthers")}</p>}
   </div>;
@@ -322,6 +341,7 @@ function DeviceSelect({
   selected,
   disabled,
   onChange,
+  optional = false,
 }: {
   label: string;
   icon: "speaker" | "cable" | "mic";
@@ -329,6 +349,7 @@ function DeviceSelect({
   selected: string | null;
   disabled: boolean;
   onChange: (id: string) => void;
+  optional?: boolean;
 }) {
   const current = devices.find((d) => d.id === selected);
   const id = useId();
@@ -346,8 +367,8 @@ function DeviceSelect({
         onChange={(e) => onChange(e.target.value)}
         title={current?.name}
       >
-        <option value="" disabled>
-          {devices.length ? t("SelectDevice") : t("NoDevices")}
+        <option value="" disabled={!optional}>
+          {optional ? t("GraphPlaybackUnused") : devices.length ? t("SelectDevice") : t("NoDevices")}
         </option>
         {selected && !current && <option value={selected}>{t("GraphOffline")}</option>}
         {devices.map((d) => (
@@ -357,7 +378,7 @@ function DeviceSelect({
         ))}
       </select>
       <span className="caption" id={`${id}-hint`}>
-        {current?.summary ?? t("RefreshDeviceHint")}
+        {current?.summary ?? t(optional && !selected ? "GraphPlaybackUnused" : "RefreshDeviceHint")}
       </span>
     </div>
   );
@@ -396,335 +417,6 @@ function Switch({
       />
       <span className="switch-visual" aria-hidden="true" />
     </label>
-  );
-}
-function Range({
-  label,
-  value,
-  min,
-  max,
-  step = 0.1,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  disabled?: boolean;
-  onChange: (value: number) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragging = useRef(false);
-  const committed = useRef(value);
-  useEffect(() => {
-    if (!dragging.current && !timer.current) { setDraft(value); committed.current = value; }
-  }, [value]);
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-  function commit(n: number) {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (n !== committed.current) { committed.current = n; onChange(n); }
-  }
-  return (
-    <div className="range-control">
-    <input
-      type="range"
-      aria-label={label}
-      value={draft}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      onPointerDown={() => {
-        dragging.current = true;
-      }}
-      onChange={(e) => {
-        const n = Number(e.target.value);
-        setDraft(n);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => commit(n), 80);
-      }}
-      onPointerUp={(e) => {
-        dragging.current = false;
-        commit(Number(e.currentTarget.value));
-      }}
-      onBlur={(e) => {
-        dragging.current = false;
-        commit(Number(e.currentTarget.value));
-      }}
-      onPointerCancel={(e) => { dragging.current = false; commit(Number(e.currentTarget.value)); }}
-      style={
-        {
-          "--range-fill": `${((draft - min) / (max - min)) * 100}%`,
-        } as React.CSSProperties
-      }
-    />
-    <div className="range-ticks" aria-hidden="true">
-      {Array.from({ length: 5 }, (_, i) => <span key={i}><i />{i === 0 || i === 2 || i === 4 ? Number((min + (max - min) * i / 4).toFixed(1)) : ""}</span>)}
-    </div>
-    </div>
-  );
-}
-function Numeric({
-  label,
-  name,
-  state,
-  min,
-  max,
-  step,
-  patch,
-}: {
-  label: string;
-  name: keyof Settings;
-  state: AppState;
-  min: number;
-  max: number;
-  step: number;
-  patch: Actions["patch"];
-}) {
-  const current = Number(state.settings[name]);
-  const [draft, setDraft] = useState(String(current));
-  useEffect(() => setDraft(String(current)), [current]);
-  async function commit(input: HTMLInputElement) {
-    if (!input.checkValidity() || draft.trim() === "") {
-      input.reportValidity();
-      setDraft(String(current));
-      return;
-    }
-    if (Number(draft) !== current && !(await patch({ [name]: Number(draft) }))) setDraft(String(current));
-  }
-  return (
-    <label className="numeric-field">
-      <span className="caption">{label}</span>
-      <input
-        type="number"
-        value={draft}
-        min={min}
-        max={max}
-        step={step}
-        disabled={!state.canEditRoute}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => commit(e.currentTarget)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-      />
-    </label>
-  );
-}
-function SettingsPage({ state, act, patch }: Actions) {
-  const processingBus = state.graph.nodes.find(n => n.id === state.simpleBusId && n.kind === "bus") ?? state.graph.nodes.find(n => n.kind === "bus");
-  const processing = processingBus ?? state.settings;
-  const patchProcessing = (values: { compressorEnabled?: boolean; compressorThresholdDb?: number; compressorRatio?: number }) => {
-    const latest = readState()!;
-    return act("graph", { revision: latest.graphRevision, project: { ...latest.graph,
-      nodes: latest.graph.nodes.map(n => n.id === processingBus?.id ? { ...n, ...values } : n) } });
-  };
-  const [resetOpen, setResetOpen] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (resetOpen) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [resetOpen]);
-  return (
-    <>
-      <section className="card settings-card">
-        <div className="section-heading">
-          <div>
-            <h3>{t("Updates")}</h3>
-            <p className="caption">{state.appVersion}</p>
-          </div>
-          <button
-            className="button"
-            disabled={state.updating || state.isDownloadingUpdate}
-            onClick={() => act("checkUpdates")}
-          >
-            {state.updating ? t("Checking") : t("CheckUpdates")}
-          </button>
-        </div>
-        <p className="caption" role="status">
-          {state.updateMessage}
-        </p>
-        {state.hasReleasePage && (
-          <button className="button small" onClick={() => act("openRelease")}>
-            <Icon name="external" size={14} />
-            {t("ReleasePage")}
-          </button>
-        )}
-      </section>
-      <section className="card settings-card">
-        <h3>{t("AppBehavior")}</h3>
-        <Switch label={t("StartWithWindows")} description={t("StartupHint")} value={state.settings.startWithWindows}
-          disabled={!state.canEditSettings} onChange={(startWithWindows) => patch({ startWithWindows })} />
-        <label className="device-field language-field">
-          <span className="field-title">{t("SettingsLanguage")}</span>
-          <select
-            value={state.settings.language}
-            disabled={!state.canEditSettings}
-            onChange={(e) => patch({ language: e.target.value })}
-          >
-            {languages.map((language) => (
-              <option key={language.code} value={language.code}>
-                {language.name}
-              </option>
-            ))}
-          </select>
-          <span className="caption">{t("LanguageChangeHint")}</span>
-        </label>
-        <Switch
-          label={t("UseTray")}
-          description={t("TrayBehaviorHint")}
-          value={state.settings.minimizeToTray}
-          disabled={!state.canEditSettings}
-          onChange={(minimizeToTray) => patch({ minimizeToTray })}
-        />
-        <p className="inset-note caption">
-          {t("TrayExitHint")}
-          <br />
-          {t("TrayDisabledHint")}
-        </p>
-      </section>
-      {state.advancedMode ? <p className="inset-note caption">{t("GraphNodeSettingsHint")}</p> : <section className="card settings-card">
-        <h3>{processingBus ? t("GraphSelectedProcessing", nodeName(processingBus)) : t("AudioProcessing")}</h3>
-        <Switch
-          label={t("ReduceLoudSounds")}
-          description={t("CompressorHint")}
-          value={processing.compressorEnabled}
-          disabled={!state.canEditSettings || !processingBus}
-          onChange={(compressorEnabled) => patchProcessing({ compressorEnabled })}
-        />
-        {processing.compressorEnabled && (
-          <div className="two-fields">
-            <label className="slider-field">
-              <span className="caption">
-                {t(
-                  "ThresholdValue",
-                  processing.compressorThresholdDb.toFixed(1),
-                )}
-              </span>
-              <Range
-                label={t("CompressorThreshold")}
-                value={processing.compressorThresholdDb}
-                min={-60}
-                max={0}
-                disabled={!state.canEditSettings}
-                onChange={(compressorThresholdDb) =>
-                  patchProcessing({ compressorThresholdDb })
-                }
-              />
-            </label>
-            <label className="slider-field">
-              <span className="caption">
-                {t("RatioValue", processing.compressorRatio.toFixed(1))}
-              </span>
-              <Range
-                label={t("CompressorRatio")}
-                value={processing.compressorRatio}
-                min={1}
-                max={20}
-                disabled={!state.canEditSettings}
-                onChange={(compressorRatio) => patchProcessing({ compressorRatio })}
-              />
-            </label>
-          </div>
-        )}
-      </section>}
-      <section className="card settings-card">
-        <h3>{t("AudioEngine")}</h3>
-        <div className="two-fields">
-          <Numeric
-            label={t("SampleRate")}
-            name="sampleRate"
-            state={state}
-            min={22050}
-            max={192000}
-            step={1}
-            patch={patch}
-          />
-          <Numeric
-            label={t("Channels")}
-            name="channels"
-            state={state}
-            min={1}
-            max={2}
-            step={1}
-            patch={patch}
-          />
-          <Numeric
-            label={t("Latency")}
-            name="latencyMilliseconds"
-            state={state}
-            min={10}
-            max={250}
-            step={1}
-            patch={patch}
-          />
-          <Numeric
-            label={t("Buffer")}
-            name="bufferMilliseconds"
-            state={state}
-            min={80}
-            max={1000}
-            step={1}
-            patch={patch}
-          />
-        </div>
-        <p className="caption">
-          {t("EngineDefaults")}
-          <br />
-          {t("StopBeforeEngineChange")}
-          <br />{t("EngineBufferHint")}
-        </p>
-      </section>
-      <section className="card settings-card">
-        <h3>{t("ManageSettings")}</h3>
-        <p className="caption">{t("ResetDescription")}</p>
-        <button
-          className="button"
-          disabled={!state.canResetSettings}
-          onClick={() => setResetOpen(true)}
-        >
-          {t("ResetSettings")}
-        </button>
-        {state.settingsMessage && (
-          <p className="caption" role="status">
-            {state.settingsMessage}
-          </p>
-        )}
-      </section>
-      <dialog
-        ref={dialog}
-        onCancel={() => setResetOpen(false)}
-        onClose={() => setResetOpen(false)}
-      >
-        <div className="dialog-body">
-          <h3>{t("ResetTitle")}</h3>
-          <p>{t("ResetConfirmation")}</p>
-          <div className="dialog-actions">
-            <button className="button" onClick={() => setResetOpen(false)}>
-              {t("Cancel")}
-            </button>
-            <button
-              className="button danger"
-              onClick={async () => {
-                setResetOpen(false);
-                await act("reset");
-              }}
-            >
-              {t("Reset")}
-            </button>
-          </div>
-        </div>
-      </dialog>
-    </>
   );
 }
 function HelpPage() {

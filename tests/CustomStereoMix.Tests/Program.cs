@@ -14,6 +14,7 @@ var tests = new (string Name, Action Body)[]
     ("legacy settings migrate without enabling microphone or changing DSP", GraphTests.Migration),
     ("graph mixing fans out, sums buses at output and isolates send mute", GraphTests.MixAndFanout),
     ("node disable removes processing paths while mute preserves topology", GraphTests.ActivationAndMute),
+    ("close and minimize tray preferences migrate, remain independent and persist", GraphTests.IndependentTrayPreferences),
     ("independent audio queues correct positive and negative clock drift", GraphTests.AdaptiveClocks),
     ("graph bridge revisions, mode switches, live gains and persistence", GraphTests.BridgeAndPersistence),
     ("graph settings preserve v1 backup and reject invalid window geometry", GraphTests.StoreMigrationBackup),

@@ -10,7 +10,7 @@
 
 Custom Stereo Mix is a Windows app for **mixing playback loopbacks, microphones and virtual capture inputs into multiple output devices**. Simple mode keeps everyday playback routing and microphone controls. Advanced mode lets you connect several mixes with nodes and edges. With a virtual audio cable, Discord, OBS, recording or STT apps can receive a mix as an input.
 
-This README describes the **2.0.1 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
+This README describes the **2.0.2 source version**. Completed checks and remaining stabilization work are recorded in [validation notes](docs/VALIDATION.md).
 
 ## Features
 
@@ -43,7 +43,7 @@ Playback + microphone
 
 ![Simple mode with playback routing and microphone toggle](docs/images/simple-mode.png)
 
-With several mixes, choose the mix to edit. Simple mode preserves additional sends, outputs and other mixes. **Changing modes does not stop audio.**
+With several mixes, choose the mix to edit; the selected advanced-mode mix carries over. Simple mode preserves additional connections and other mixes. Activation and mute are independent. Silence diagnostics offer unmute actions and device settings links. **Changing modes does not stop audio.** Stop to change microphone inclusion; adjust microphone gain and mute while running. Start/stop applies to all mixes.
 
 <a id="advanced"></a>
 
@@ -51,8 +51,8 @@ With several mixes, choose the mix to edit. Simple mode preserves additional sen
 
 Enable the header toggle, then:
 
-1. Add playback, capture, mix and output nodes from **Add node** or the device library.
-2. Drag source ports into mix inputs, then mix ports into outputs. The inspector's connection selector is an alternative.
+1. Start with **Add node → Create mix**. Name the new mix, then use **Add input → Add output** in its inspector. Choose existing nodes or add devices in the same panel.
+2. You can also drag source ports into mix inputs, then mix ports into outputs. At reduced zoom, select a summary node and use inspector connection selectors. The device library shows physical/virtual and already added devices; choosing an added device opens its existing node.
 3. Adjust each send's gain and mute inside the mix. One source can feed several mixes; one mix can feed several outputs.
 4. **Right-click** a node or open **…** for activation, mute, inspector and delete. Clicking a node or choosing **Inspector** opens the shared right panel. Click an edge for send gain, mute or deletion.
 5. Use **Start all / Stop all** for connected mixes.
@@ -63,14 +63,18 @@ The inspector orders controls as **activation → audio → identity → process
 
 ![Node inspector with activation first and the shared context menu](docs/images/node-settings.png)
 
+New mixes show name and input/output setup immediately after activation. Opening panels or the mixer preserves zoom and only pans to reveal a hidden selected node. Small windows alternate between the inspector and mixer. Meters show **dBFS** and peak hold; ready, unconnected, running and device errors are separate from activation.
+
 Gain, mute and processing can change while running. **Stop before changing activation, devices, nodes or connection structure.** Duplicate output endpoints and detected playback/virtual-cable return paths are rejected. Use `Shift+F10` for the node menu; Enter applies numeric edits and Escape cancels them. Advanced-mode node processing lives in the inspector; simple-mode settings retain processing for the selected mix.
+
+Out-of-range input stays visible with an error and unit. Parameter **undo/redo works while running**; structure history requires stopping. A slider gesture or name edit is one undo step. Escape closes a menu and restores focus; Tab moves to the next control.
 
 <details>
 <summary>Selected-mix dock</summary>
 
 ![Mixer dock with individual send faders and master controls](docs/images/mixer.png)
 
-The mixer toolbar button opens send faders, meters, mutes and master controls for the selected bus. These edit the same parameters as the graph.
+The mixer toolbar button opens send faders, meters, mutes and master controls for the selected bus. Selecting a mix updates the dock. **Pin mixer** keeps it on one mix; **Follow selection** resumes synchronization. Drag the top handle or use arrow keys to resize. These edit the same parameters as the graph.
 
 </details>
 
@@ -93,11 +97,11 @@ Closing or minimizing hides the app to the tray by default and preserves routing
 <details>
 <summary>Settings and guide</summary>
 
-![Update, startup, language and tray settings](docs/images/settings.png)
+![Audio, application and information tabs with audio-engine settings](docs/images/settings.png)
 
 ![Virtual cable setup guide](docs/images/usage-guide.png)
 
-Scroll settings for engine parameters and reset. Node processing is in the advanced-mode inspector, while simple mode offers selected-mix processing in settings. Language changes apply immediately without restarting audio.
+Settings has **Audio / Application / About & updates** tabs. Audio offers sample-rate presets, mono/stereo, latency presets or custom values, with buffer size under engine details. Close behavior and hide-on-minimize are independent. Node processing is in the advanced-mode inspector; simple mode offers selected-mix processing in settings. Language changes apply immediately without restarting audio.
 
 </details>
 
@@ -117,7 +121,7 @@ The C# build restores npm dependencies and builds the React frontend.
 | Task | Command | Output |
 |---|---|---|
 | Folder distribution | `.\build_exe.ps1` | `artifacts\webview2\` |
-| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.1-Setup-x64.exe` |
+| Installer | `.\build_installer.ps1` | `artifacts\setup\CustomStereoMix-2.0.2-Setup-x64.exe` |
 
 Installer builds require Inno Setup 7. Pass `-IsccPath 'C:\path\ISCC.exe'` for a custom location. The default version lives in `Directory.Build.props`. Use `-RegenerateIcons` only when changing app-icon sources. See [release documentation](docs/RELEASING.md) for tagged releases and updates.
 
@@ -136,6 +140,7 @@ Open `http://127.0.0.1:5173/?advanced`. **The browser uses sample devices and me
 ```powershell
 dotnet run --project tests\CustomStereoMix.Tests -c Release
 dotnet run --project tests\CustomStereoMix.Tests -c Release -- --list-audio-devices
+npm --prefix ui test
 ```
 
 Tests cover graph validation, feedback, mixing, output buffers, migration, persistence, bridge, localization and updates. Native muted-session commands and uncompleted listening/long-run checks are in [validation notes](docs/VALIDATION.md).

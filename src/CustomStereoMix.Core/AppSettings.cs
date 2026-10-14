@@ -13,6 +13,8 @@ public sealed record AppSettings
     public string? TargetDeviceId { get; init; }
     public string? MicrophoneDeviceId { get; init; }
     public bool MinimizeToTray { get; init; } = true;
+    // Missing in older settings: preserve the previous shared close/minimize policy.
+    public bool? CloseToTray { get; init; }
     // Null means this installation has not dismissed the setup guide yet.
     public bool? HideUsageOnStartup { get; init; }
     public ProcessingSettings Processing { get; init; } = ProcessingSettings.Default;

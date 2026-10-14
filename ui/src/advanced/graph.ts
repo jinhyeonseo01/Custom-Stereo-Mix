@@ -1,5 +1,6 @@
 import { t } from "../i18n";
 import type { AppState, AudioNodeConfig, AudioNodeKind, GraphProject } from "../types";
+export { sameTopology } from "./history";
 export const nodeName = (n: AudioNodeConfig) => n.label || t(n.kind === "bus" ? "MixBus" : n.kind === "capture" ? "InputAudio" : n.kind === "output" ? "OutputAudio" : "PlaybackAudio");
 export const deviceList = (s: AppState, k: AudioNodeKind) => k === "capture" ? s.microphones : k === "bus" ? [] : k === "output" ? s.targets : s.sources;
 export const nodeRole = (n: AudioNodeConfig) => t(n.kind === "bus" ? "MixBus" : n.kind === "capture" ? "InputAudio" : n.kind === "output" ? "OutputAudio" : "PlaybackAudio");
@@ -70,11 +71,6 @@ export function graphError(g: GraphProject, catalog?: Pick<AppState, "sources" |
     visiting.delete(id); visited.add(id); return false;
   };
   return g.nodes.some(n => cycle(n.id)) ? t("GraphCycle") : "";
-}
-export function sameTopology(a: GraphProject, b: GraphProject) {
-  return a.nodes.length === b.nodes.length && a.edges.length === b.edges.length &&
-    a.nodes.every(n => b.nodes.some(m => m.id === n.id && m.kind === n.kind && m.deviceId === n.deviceId && m.enabled === n.enabled)) &&
-    a.edges.every(e => b.edges.some(f => f.id === e.id && f.source === e.source && f.target === e.target));
 }
 export function previewGraph(): GraphProject {
   const nodes = [createNode("loopback", "speakers", t("GraphSourceName")), createNode("capture", "mic", t("GraphMicName"), 1),
